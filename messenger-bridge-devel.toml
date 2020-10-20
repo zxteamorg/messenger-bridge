@@ -1,0 +1,43 @@
+# File format: https://github.com/toml-lang/toml
+
+#
+# Usually this file extends base configuration defined messenger-bridge.toml
+#
+
+# Select messengers to be used
+messenger_indexer = "bot1"
+
+[approvement]
+	# Select topics to be enabled
+	topic_indexer = "DeployProduction"
+
+	[[approvement.topic]]
+		index = "DeployProduction"
+		description = "Requests to deploy new version of an application."
+		requireVotes = 2
+		expireTimeout = 3600
+		#authType = "???TBD???"
+		schema = """
+{
+	"appName", "appVerion"
+}
+"""
+
+[[messenger]]
+	index = "bot1"
+	type = "telegram"
+	#apiToken =
+	approvementTopicBinding_indexer = "topicBinding1"
+
+	[[messenger.approvementTopicBinding]]
+		index = "topicBinding1"
+		bindTopic = "DeployProduction"
+		#chatId = <Telegram's Unique identifier for the target chat or username of the target channel (in the format @channelusername)>
+		#approvers = "user1 user2 user3 userN" // all users if missing
+		renderTemplate = """
+<b>Do you allow deploy to production?</b>
+<i>Application: </i><b>{{appName}}</b>
+<i>Version: </i><b>{{appVerion}}</b>
+<a href="https://github.com/zxteamorg/messenger-bridge/releases/{{appVerion}}">Release Notes</a>
+<a href="https://github.com/zxteamorg/messenger-bridge/blob/master/CHANGELOG.md">Changelog</a>
+"""

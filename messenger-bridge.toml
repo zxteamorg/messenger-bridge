@@ -1,0 +1,36 @@
+# File format: https://github.com/toml-lang/toml
+
+
+# Select Web servers to be used (splitted by space)
+server_indexer = "apiSrv"
+
+# Select endpoints to be used (splitted by space)
+endpoint_indexer = "rest welcome"
+
+[[server]]
+	# Declare an API HTTP server
+	index = "apiSrv"
+	type = "http"
+	listenHost = "0.0.0.0"
+	listenPort = 8080
+
+[[endpoint]]
+	# Declare REST endpoint and bound to the API HTTP server on path /v1
+	index = "rest"
+	type = "rest"
+	servers = "apiSrv"
+	bindPath = "/v1"
+
+[[endpoint]]
+	# Declare Welcome Page endpoint and bound to the API HTTP server on path /
+	index = "welcome"
+	type = "welcome-page"
+	servers = "apiSrv"
+	bindPath = "/" 
+
+[[endpoint]]
+	# Declare WebSocket endpoint and bound to the API HTTP server on path /ws1
+	index = "ws"
+	type = "websocket"
+	servers = "apiSrv"
+	bindPath = "/ws1"

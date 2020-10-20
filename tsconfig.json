@@ -1,0 +1,18 @@
+{
+	"//": "This is used in our build process. Also this file is requred by VSCode",
+	"compilerOptions": {
+		"alwaysStrict": true,
+		"declaration": false,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"noImplicitAny": true,
+		"target": "es2020",
+		"strict": true,
+		"strictBindCallApply": true,
+		"strictFunctionTypes": true,
+		"strictNullChecks": true,
+		"strictPropertyInitialization": true
+	}
+}

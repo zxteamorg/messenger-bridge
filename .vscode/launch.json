@@ -1,0 +1,61 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug",
+			"type": "pwa-node",
+			"runtimeArgs": [
+				"--require",
+				"source-map-support/register",
+			],
+			"request": "launch",
+			"preLaunchTask": "compile:src:ts",
+			"cwd": "${workspaceRoot}",
+			"env": {
+				"NODE_ENV": "development",
+				"LOG4JS_CONFIG": "${workspaceFolder}/log4js-devel.json"
+			},
+			"envFile": "${workspaceFolder}/.env",
+			"program": "${workspaceRoot}/bin/app.js",
+			"args": [
+				"--config-toml-file=${workspaceRoot}/messenger-bridge.toml",
+				"--config-toml-file=${workspaceRoot}/messenger-bridge-devel.toml",
+				"--config-env"
+			],
+			"skipFiles": [
+				"<node_internals>/**"
+			]
+		},
+		{
+			"name": "Debug Test",
+			"type": "pwa-node",
+			"request": "launch",
+			"preLaunchTask": "compile:test:ts",
+			"runtimeExecutable": null,
+			"runtimeArgs": [
+				"--require",
+				"source-map-support/register",
+				"--nolazy"
+			],
+			"stopOnEntry": false,
+			"program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
+			"args": [
+				"--no-timeouts",
+				"--colors",
+				"--debug-brk",
+				"--recursive",
+				"test/**/*.test.js"
+			],
+			"cwd": "${workspaceRoot}",
+			"env": {
+				"NODE_ENV": "development"
+			},
+			"console": "internalConsole",
+			"sourceMaps": true,
+			"outFiles": [
+				"${workspaceRoot}/src/**/*.js",
+				"${workspaceRoot}/test/**/*.js"
+			]
+		}
+	]
+}

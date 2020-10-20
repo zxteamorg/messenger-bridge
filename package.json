@@ -1,0 +1,59 @@
+{
+	"name": "@zxteam/messenger-bridge",
+	"version": "0.0.1",
+	"description": "APPROVE ME is a helper service to collect approvement votes via messenger networks like Telegram, Slack, etc...",
+	"main": "./src/index.js",
+	"types": "./src/index.d.ts",
+	"author": {
+		"name": "ZXTeam",
+		"email": "devel@zxteam.org",
+		"url": "https://messenger-bridge.zxteam.org/"
+	},
+	"contributors": [
+		{
+			"name": "Maxim Anurin",
+			"email": "maxim.anurin@zxteam.org",
+			"url": "http://www.anurin.name"
+		},
+		{
+			"name": "Serhii Zghama",
+			"email": "serhii.zghama@zxteam.org"
+		}
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/lodash": "^4.14.149",
+		"@types/mustache": "^4.0.1",
+		"@types/uuid": "^8.3.0",
+		"@zxnode/build": "^0.0.38"
+	},
+	"dependencies": {
+		"@zxteam/cancellation": "^6.0.62",
+		"@zxteam/channels": "^6.0.62",
+		"@zxteam/configuration": "^6.0.64",
+		"@zxteam/contract": "^6.0.62",
+		"@zxteam/disposable": "^6.0.63",
+		"@zxteam/ensure": "^6.0.63",
+		"@zxteam/hosting": "^6.0.63",
+		"@zxteam/launcher": "^6.0.64",
+		"@zxteam/logger": "^6.0.63",
+		"@zxteam/web-client": "^6.0.62",
+		"express": "^4.17.1",
+		"lodash": "^4.17.20",
+		"mustache": "^4.0.1",
+		"uuid": "^8.3.1"
+	},
+	"engines": {
+		"node": ">=11"
+	},
+	"keywords": [],
+	"scripts": {
+		"start": "node ./src/app.js --config=\"app.config\"",
+		"clean": "zxbuild clean",
+		"compile": "zxbuild compile:src",
+		"build": "zxbuild clean && zxbuild dist && cp README.md package-lock.json .dist/ && cp -r bin/ .dist/",
+		"test": "nyc --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha \"test/**/*.test.js\" --recursive",
+		"test:only": "mocha --require source-map-support/register \"test/**/*.test.js\" --recursive"
+	},
+	"private": true
+}

@@ -1,0 +1,6 @@
+#!/bin/bash
+#
+
+set -ex
+
+docker build --build-arg "DOCKER_TAG=${DOCKER_TAG}" --file "${DOCKERFILE_PATH}" --tag "${IMAGE_NAME}" .

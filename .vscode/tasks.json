@@ -1,0 +1,69 @@
+{
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"options": {
+		"cwd": "${workspaceRoot}",
+		"env": {
+			"NODE_ENV": "development",
+			"BUILD_TARGET": "devel"
+		}
+	},
+	"type": "shell",
+	"command": "zxbuild",
+	"linux": {
+		"command": "node_modules/.bin/zxbuild"
+	},
+	"osx": {
+		"command": "node_modules/.bin/zxbuild"
+	},
+	"windows": {
+		"command": "node_modules\\.bin\\zxbuild.cmd"
+	},
+	"tasks": [
+		{
+			"label": "compile:src:lint",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": {
+				"base": "$tslint5",
+				"fileLocation": "absolute"
+			}
+		},
+		{
+			"label": "compile:src:ts",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": {
+				"base": "$tsc",
+				"fileLocation": "relative"
+			}
+		},
+		{
+			"label": "compile:test:lint",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": {
+				"base": "$tslint5",
+				"fileLocation": "absolute"
+			}
+		},
+		{
+			"label": "compile:test:ts",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": {
+				"base": "$tsc",
+				"fileLocation": "relative"
+			}
+		}
+	]
+}
