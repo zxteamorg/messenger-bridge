@@ -3,6 +3,7 @@
 
 set -ex
 
-ls -la
+# Docker Hub start the script in Dockerfile's directory, so move one level up
+cd ..
 
 docker build --build-arg "DOCKER_TAG=${DOCKER_TAG}" --file "${DOCKERFILE_PATH}" --tag "${IMAGE_NAME}" .
