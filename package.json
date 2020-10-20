@@ -1,6 +1,6 @@
 {
 	"name": "@zxteam/messenger-bridge",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "APPROVE ME is a helper service to collect approvement votes via messenger networks like Telegram, Slack, etc...",
 	"main": "./src/index.js",
 	"types": "./src/index.d.ts",
