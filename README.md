@@ -157,9 +157,4 @@ GET /v1/approvement/{{topic}}/{{approvementId}}
 ```
 
 ### WebSocket API
-
-
-
-curl -v -X POST -H "Content-Type: application/json" -d '{"appName":"ZXTrader Aggregator","appVerion":"0.1.12"}' http://127.0.0.1:8080/v1/approvement/DeployProduction
-
-curl -v -X POST -H "Content-Type: application/json" -d '{"firstName":"Сергей","lastName":"Иванов","position":"Начинающий PHP гавнокодер","permissions":["Доступ в GitLab","Доступ в БД","Доступ в туалет"]}' http://127.0.0.1:8080/v1/approvement/ProvideInitialAccess
+TBD

@@ -27,6 +27,31 @@
 			]
 		},
 		{
+			"name": "Debug (local config)",
+			"type": "pwa-node",
+			"runtimeArgs": [
+				"--require",
+				"source-map-support/register",
+			],
+			"request": "launch",
+			"preLaunchTask": "compile:src:ts",
+			"cwd": "${workspaceRoot}",
+			"env": {
+				"NODE_ENV": "development",
+				"LOG4JS_CONFIG": "${workspaceFolder}/log4js-devel.json"
+			},
+			"envFile": "${workspaceFolder}/.env",
+			"program": "${workspaceRoot}/bin/app.js",
+			"args": [
+				"--config-toml-file=${workspaceRoot}/messenger-bridge.toml",
+				"--config-toml-file=${workspaceRoot}/messenger-bridge.local.toml",
+				"--config-env"
+			],
+			"skipFiles": [
+				"<node_internals>/**"
+			]
+		},
+		{
 			"name": "Debug Test",
 			"type": "pwa-node",
 			"request": "launch",

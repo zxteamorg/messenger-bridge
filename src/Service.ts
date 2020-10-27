@@ -121,10 +121,15 @@ export class Service extends Initable {
 			}
 		}
 
+		if (approvementMessageTokens.length === 0) {
+			throw new InvalidOperationError(
+				`Cannot register an approvement, due no any messenger attached to topic '${approvementTopicName}'. Looks like misconfiguration.`
+			);
+		}
+
 		const approvement: Approvement = {
 			approvementId,
 			approvementTopic,
-			//status: "PENDING",
 			expireAt,
 			approvedBy: Object.freeze([]),
 			refuseBy: null
