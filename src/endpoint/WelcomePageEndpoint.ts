@@ -1,5 +1,4 @@
-import { Logger } from "@zxteam/contract";
-import { Configuration as HostingConfiguration, WebServer } from "@zxteam/hosting";
+import { FHostingConfiguration, FWebServer } from "@freemework/hosting";
 
 import * as path from "path";
 import * as express from "express";
@@ -7,8 +6,8 @@ import * as express from "express";
 import { BaseEndpoint } from "./BaseEndpoint";
 
 export class WelcomePageEndpoint extends BaseEndpoint {
-	public constructor(servers: ReadonlyArray<WebServer>, opts: HostingConfiguration.BindEndpoint, log: Logger) {
-		super(servers, opts, log);
+	public constructor(servers: ReadonlyArray<FWebServer>, opts: FHostingConfiguration.BindEndpoint) {
+		super(servers, opts);
 
 		const staticFilesDir: string = path.join(__dirname, "..", "..", "res", "WelcomePageEndpoint");
 

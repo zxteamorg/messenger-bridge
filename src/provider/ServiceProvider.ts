@@ -1,20 +1,16 @@
-import { Logger, CancellationToken } from "@zxteam/contract";
-import { Initable } from "@zxteam/disposable";
-import { Container, Provides, Singleton } from "@zxteam/launcher";
-import { logger } from "@zxteam/logger";
+import { FInitableBase } from "@freemework/common";
 
 import * as _ from "lodash";
+
+import { Container, Provides, Singleton } from "typescript-ioc";
 
 import { Service } from "../Service";
 import { ConfigurationProvider } from "./ConfigurationProvider";
 
 @Singleton
-export abstract class ServiceProvider extends Initable {
-	protected readonly log: Logger;
-
+export abstract class ServiceProvider extends FInitableBase {
 	public constructor() {
 		super();
-		this.log = logger.getLogger("ServiceProvider");
 	}
 
 	public abstract get service(): Service;
@@ -27,15 +23,15 @@ class ServiceProviderImpl extends ServiceProvider {
 	public constructor() {
 		super();
 		const cfg: ConfigurationProvider = Container.get(ConfigurationProvider);
-		this._service = new Service(cfg, this.log.getLogger(Service.name));
+		this._service = new Service(cfg);
 	}
 
 	public get service(): Service {
 		return this._service;
 	}
 
-	protected async onInit(cancellationToken: CancellationToken): Promise<void> {
-		await this._service.init(cancellationToken);
+	protected async onInit(): Promise<void> {
+		await this._service.init(this.initExecutionContext);
 	}
 
 	protected async onDispose(): Promise<void> {

@@ -1,13 +1,12 @@
-import { Configuration as RawConfiguration } from "@zxteam/contract";
-import { ConfigurationError, InvalidOperationError } from "@zxteam/errors";
-import { Configuration as HostingConfiguration } from "@zxteam/hosting";
+import { FConfiguration as RawConfiguration, FExceptionConfiguration, FExceptionInvalidOperation } from "@freemework/common";
+import { FHostingConfiguration } from "@freemework/hosting";
 
 import * as _ from "lodash";
 import { ApprovementTopicName } from "./model/Primitives";
 import { ApprovementTopic } from "./model/ApprovementTopic";
 
 export interface Configuration {
-	readonly servers: ReadonlyMap<HostingConfiguration.WebServer["name"], HostingConfiguration.WebServer>;
+	readonly servers: ReadonlyMap<FHostingConfiguration.WebServer["name"], FHostingConfiguration.WebServer>;
 	readonly endpoints: ReadonlyArray<Configuration.Endpoint>;
 	readonly messengers: ReadonlyMap<Configuration.Messenger["name"], Configuration.Messenger>;
 	readonly approvement: {
@@ -18,12 +17,12 @@ export interface Configuration {
 export namespace Configuration {
 	export type Endpoint = RestEndpoint | WebSocketEndpoint;
 
-	export interface RestEndpoint extends HostingConfiguration.BindEndpoint, HostingConfiguration.ServerEndpoint {
+	export interface RestEndpoint extends FHostingConfiguration.BindEndpoint, FHostingConfiguration.ServerEndpoint {
 		readonly type: "rest" | "welcome-page";
 		readonly cors: Cors | null;
 	}
 	export interface WebSocketEndpoint
-		extends HostingConfiguration.WebSocketEndpoint, HostingConfiguration.ServerEndpoint {
+		extends FHostingConfiguration.WebSocketEndpoint, FHostingConfiguration.ServerEndpoint {
 		readonly type: "websocket";
 	}
 
@@ -67,7 +66,7 @@ export namespace Configuration {
 			>;
 		}
 
-		export class UnreachableMessengerType extends ConfigurationError {
+		export class UnreachableMessengerType extends FExceptionConfiguration {
 			public constructor(messenger: never) {
 				super(`Wrong messenger type: ${JSON.stringify(messenger)}.`, "type", null);
 			}
@@ -123,15 +122,15 @@ export namespace Configuration {
 	}
 
 	export function parseServers(configuration: RawConfiguration): ReadonlyMap<
-		HostingConfiguration.WebServer["name"],
-		HostingConfiguration.WebServer
+		FHostingConfiguration.WebServer["name"],
+		FHostingConfiguration.WebServer
 	> {
 		const serverIndexes: ReadonlyArray<string> = configuration.getString("server_indexer").split(" ");
-		const servers: Map<HostingConfiguration.WebServer["name"], HostingConfiguration.WebServer> = new Map();
+		const servers: Map<FHostingConfiguration.WebServer["name"], FHostingConfiguration.WebServer> = new Map();
 		for (const serverName of serverIndexes) {
 			const serverKey: string = `server.${serverName}`;
 			const serverConfiguration: RawConfiguration = configuration.getNamespace(serverKey);
-			servers.set(serverName, HostingConfiguration.parseWebServer(serverConfiguration, serverName));
+			servers.set(serverName, FHostingConfiguration.parseWebServer(serverConfiguration, serverName));
 		}
 		return servers;
 	}
@@ -146,7 +145,7 @@ export namespace Configuration {
 			const messengerType: Messenger["type"] = messengerConfiguration.getString("type") as Messenger["type"];
 			switch (messengerType) {
 				case "slack":
-					throw new InvalidOperationError("Not implemented yet.");
+					throw new FExceptionInvalidOperation("Not implemented yet.");
 				case "telegram": {
 					const approvementTopicIndexers: ReadonlyArray<string> = messengerConfiguration.getString("approvementTopicBinding_indexer").split(" ");
 
@@ -166,7 +165,7 @@ export namespace Configuration {
 							renderTemplate: bindingConfiguration.getString("renderTemplate")
 						};
 						if (approvementTopicBindings.has(approvementTopicBinding.bindTopic)) {
-							throw new ConfigurationError(
+							throw new FExceptionConfiguration(
 								`Approvement Topic Binding name '${approvementTopicBinding.bindTopic}' duplication detected.`,
 								approvementTopicBindingKey,
 								null

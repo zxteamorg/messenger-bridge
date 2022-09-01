@@ -1,9 +1,7 @@
-import { Logger, CancellationToken } from "@zxteam/contract";
-import { Initable } from "@zxteam/disposable";
-import { Container, Inject, Provides, Singleton } from "@zxteam/launcher";
-import { logger } from "@zxteam/logger";
+import { FExecutionContextLogger, FInitable, FInitableBase, FLogger } from "@freemework/common";
 
 import * as _ from "lodash";
+import { Container, Provides, Singleton } from "typescript-ioc";
 
 // Providers
 import { ConfigurationProvider } from "./ConfigurationProvider";
@@ -16,24 +14,19 @@ import { WSEndpoint } from "../endpoint/WSEndpoint";
 import { ServiceProvider } from "./ServiceProvider";
 
 @Singleton
-export abstract class EndpointsProvider extends Initable {
-	protected readonly log: Logger;
-
+export abstract class EndpointsProvider extends FInitableBase {
 	public constructor() {
 		super();
-		this.log = logger.getLogger("EndpointsProvider");
 	}
 }
 
 @Provides(EndpointsProvider)
 class EndpointsProviderImpl extends EndpointsProvider {
-	private readonly _endpointInstances: Array<Initable>;
+	private readonly _endpointInstances: Array<FInitable>;
 	private readonly _destroyHandlers: Array<() => Promise<void>>;
 
 	public constructor() {
 		super();
-
-		this.log.info("Constructing endpoints...");
 
 		const configurationProvider: ConfigurationProvider = Container.get(ConfigurationProvider);
 		const hostingProvider: HostingProvider = Container.get(HostingProvider);
@@ -47,26 +40,21 @@ class EndpointsProviderImpl extends EndpointsProvider {
 			switch (endpoint.type) {
 				case "rest": {
 					const endpointInstance: RestEndpoint = new RestEndpoint(
-						endpointServers, endpoint,
-						this.log.getLogger(endpoint.type + ":" + endpoint.bindPath),
-						serviceProvider.service
+						endpointServers, endpoint, serviceProvider.service
 					);
 					this._endpointInstances.push(endpointInstance);
 					break;
 				}
 				case "welcome-page": {
 					const endpointInstance: WelcomePageEndpoint = new WelcomePageEndpoint(
-						endpointServers, endpoint,
-						this.log.getLogger(endpoint.type + ":" + endpoint.bindPath)
+						endpointServers, endpoint
 					);
 					this._endpointInstances.push(endpointInstance);
 					break;
 				}
 				case "websocket": {
 					const endpointInstance: WSEndpoint = new WSEndpoint(
-						endpointServers, endpoint,
-						this.log.getLogger(endpoint.type + ":" + endpoint.bindPath),
-						serviceProvider.service
+						endpointServers, endpoint, serviceProvider.service
 					);
 					this._endpointInstances.push(endpointInstance);
 					break;
@@ -79,11 +67,13 @@ class EndpointsProviderImpl extends EndpointsProvider {
 		this._destroyHandlers = [];
 	}
 
-	protected async onInit(cancellationToken: CancellationToken): Promise<void> {
-		this.log.info("Initializing endpoints...");
+	protected async onInit(): Promise<void> {
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+		logger.info("Initializing endpoints...");
 		try {
 			for (const endpointInstance of this._endpointInstances) {
-				await endpointInstance.init(cancellationToken);
+				await endpointInstance.init(this.initExecutionContext);
 				this._destroyHandlers.push(() => endpointInstance.dispose());
 			}
 		} catch (e) {
@@ -96,7 +86,9 @@ class EndpointsProviderImpl extends EndpointsProvider {
 	}
 
 	protected async onDispose(): Promise<void> {
-		this.log.info("Destroying endpoints...");
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+		logger.info("Destroying endpoints...");
 		let destroyHandler;
 		while ((destroyHandler = this._destroyHandlers.pop()) !== undefined) {
 			await destroyHandler();

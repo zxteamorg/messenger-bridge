@@ -1,15 +1,13 @@
-import { Logger } from "@zxteam/contract";
-import { EnsureError } from "@zxteam/ensure";
-import { ArgumentError, wrapErrorIfNeeded, InnerError } from "@zxteam/errors";
-import { Configuration as HostingConfiguration, ServersBindEndpoint, WebServer } from "@zxteam/hosting";
+import { FEnsureException, FException, FExceptionArgument, FExecutionContext, FExecutionContextLogger, FLogger } from "@freemework/common";
+import { FHostingConfiguration, FServersBindEndpoint, FWebServer } from "@freemework/hosting";
 
 import * as express from "express";
 
-export abstract class BaseEndpoint extends ServersBindEndpoint {
+export abstract class BaseEndpoint extends FServersBindEndpoint {
 	protected readonly _router: express.Router;
 
-	public constructor(servers: ReadonlyArray<WebServer>, opts: HostingConfiguration.BindEndpoint, log: Logger) {
-		super(servers, opts, log);
+	public constructor(servers: ReadonlyArray<FWebServer>, opts: FHostingConfiguration.BindEndpoint) {
+		super(servers, opts);
 		this._router = express.Router();
 		this._router.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
 			if (this.disposing || this.disposed) {
@@ -25,8 +23,10 @@ export abstract class BaseEndpoint extends ServersBindEndpoint {
 			const rootExpressApplication = server.rootExpressApplication;
 			rootExpressApplication.use(this._bindPath, this._router);
 
-			if (this._log.isInfoEnabled) {
-				this._log.info(`Endpoint '${this._bindPath}' was assigned to server '${server.name}'.`);
+			const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+			if (logger.isInfoEnabled) {
+				logger.info(`Endpoint '${this._bindPath}' was assigned to server '${server.name}'.`);
 			}
 		}
 	}
@@ -40,25 +40,30 @@ export abstract class BaseEndpoint extends ServersBindEndpoint {
 			try {
 				const result = cb(req, res);
 				if (result instanceof Promise) {
-					result.catch((e) => this.errorRenderer(wrapErrorIfNeeded(e), res));
+					result.catch((e) => this.errorRenderer(FException.wrapIfNeeded(e), res));
 				}
 			} catch (e) {
-				this.errorRenderer(wrapErrorIfNeeded(e), res);
+				this.errorRenderer(FException.wrapIfNeeded(e), res);
 			}
 		};
 		return handler;
 	}
 
-	protected errorRenderer(e: Error, res: express.Response): void {
-		if (this._log.isWarnEnabled) {
-			this._log.warn(`Unhandled error on ${this.constructor.name}: ${e.message}`);
+	protected errorRenderer(e: FException, res: express.Response): void {
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+		if (logger.isWarnEnabled) {
+			logger.warn(`Unhandled error on ${this.constructor.name}: ${e.message}`);
 		} else {
 			console.error(`Unhandled error on ${this.constructor.name}: ${e.message}`);
 		}
-		if (this._log.isDebugEnabled) { this._log.debug(`Unhandled error on ${this.constructor.name}`, e); }
-		if (e instanceof EnsureError) {
+
+		if (logger.isDebugEnabled) { 
+			logger.debug(`Unhandled error on ${this.constructor.name}`, e); 
+		}
+		if (e instanceof FEnsureException) {
 			res.writeHead(400, e.message).end();
-		} else if (e instanceof ArgumentError) {
+		} else if (e instanceof FExceptionArgument) {
 			res.writeHead(400, e.constructor.name).end();
 		} else {
 			res.writeHead(500).end();
@@ -69,7 +74,7 @@ export abstract class BaseEndpoint extends ServersBindEndpoint {
 /**
  * The error shows developer's issues. If this happens, go to dev team.
  */
-export class BrokenEndpointError extends InnerError {
+export class BrokenEndpointError extends FException {
 	//
 }
 

@@ -1,12 +1,11 @@
-import { CancellationToken, Disposable } from "@zxteam/contract";
-import { InvalidOperationError } from "@zxteam/errors";
+import { FDisposable, FExceptionInvalidOperation, FExecutionContext } from "@freemework/common";
 
 
 export interface KeyValueDb extends KeyValueDb.Operation {
 	/**
 	 * Open database transaction to make set of changes atomically.
 	 */
-	transaction(cancellationToken: CancellationToken): Promise<KeyValueDb.TransactionalOperation>;
+	transaction(executionContext: FExecutionContext): Promise<KeyValueDb.TransactionalOperation>;
 }
 
 export namespace KeyValueDb {
@@ -21,29 +20,29 @@ export namespace KeyValueDb {
 		 * Retrieve a value from the storage, or `null` if key does not exist.
 		 * @param key Unique key of the value
 		 */
-		find(cancellationToken: CancellationToken, key: Key): Promise<Value | null>;
+		find(executionContext: FExecutionContext, key: Key): Promise<Value | null>;
 
 		/**
 		 * Retrieve value from the storage
 		 * @param key Unique key of the value
 		 * @throws `KeyValueDb.NoSuchKeyError` If key does not exist.
 		 */
-		get(cancellationToken: CancellationToken, key: Key): Promise<Value>;
+		get(executionContext: FExecutionContext, key: Key): Promise<Value>;
 
 		/**
 		 * Save a value into the storage. Returns previous value.
 		 * @param key Unique key of the value
 		 * @param value Value to be stored
 		 */
-		set(cancellationToken: CancellationToken, key: Key, value: Value | null): Promise<Value | null>;
+		set(executionContext: FExecutionContext, key: Key, value: Value | null): Promise<Value | null>;
 	}
 
 	/**
 	 * A database transaction to make set of changes atomically.
 	 * Commit a transaction to save changes, or dispose to discard changes.
 	 */
-	export interface TransactionalOperation extends Operation, Disposable {
-		commit(cancellationToken: CancellationToken): Promise<void>;
+	export interface TransactionalOperation extends Operation, FDisposable {
+		commit(executionContext: FExecutionContext): Promise<void>;
 	}
 
 	export class KeyValueDbError extends Error {
@@ -81,13 +80,13 @@ export class InMemory implements KeyValueDb {
 		this._dict = new Map();
 	}
 
-	public find(cancellationToken: CancellationToken, key: string): Promise<string | null> {
+	public find(executionContext: FExecutionContext, key: string): Promise<string | null> {
 		const value: KeyValueDb.Value | undefined = this._dict.get(key);
 
 		return Promise.resolve(value !== undefined ? value : null);
 	}
 
-	public get(cancellationToken: CancellationToken, key: string): Promise<string> {
+	public get(executionContext: FExecutionContext, key: string): Promise<string> {
 		const value: KeyValueDb.Value | undefined = this._dict.get(key);
 
 		if (value === undefined) {
@@ -97,7 +96,7 @@ export class InMemory implements KeyValueDb {
 		return Promise.resolve(value);
 	}
 
-	public set(cancellationToken: CancellationToken, key: string, value: string | null): Promise<string | null> {
+	public set(executionContext: FExecutionContext, key: string, value: string | null): Promise<string | null> {
 		const oldValue: KeyValueDb.Value | undefined = this._dict.get(key);
 
 		if (value === null) {
@@ -109,7 +108,7 @@ export class InMemory implements KeyValueDb {
 		return Promise.resolve(oldValue !== undefined ? oldValue : null);
 	}
 
-	public transaction(cancellationToken: CancellationToken): Promise<KeyValueDb.TransactionalOperation> {
+	public transaction(executionContext: FExecutionContext): Promise<KeyValueDb.TransactionalOperation> {
 		return Promise.resolve(new InMemoryTransaction(this._dict));
 	}
 }
@@ -127,7 +126,7 @@ class InMemoryTransaction implements KeyValueDb.TransactionalOperation {
 		this._completed = false;
 	}
 
-	public commit(cancellationToken: CancellationToken): Promise<void> {
+	public commit(executionContext: FExecutionContext): Promise<void> {
 		this._completed = true;
 
 		const concurrencyKeys: Array<KeyValueDb.Key> = [];
@@ -163,7 +162,7 @@ class InMemoryTransaction implements KeyValueDb.TransactionalOperation {
 		return Promise.resolve();
 	}
 
-	public find(cancellationToken: CancellationToken, key: string): Promise<string | null> {
+	public find(executionContext: FExecutionContext, key: string): Promise<string | null> {
 		this.verifyCompleted();
 
 		const transactionValue: KeyValueDb.Value | undefined = this._transactionDict.get(key);
@@ -186,7 +185,7 @@ class InMemoryTransaction implements KeyValueDb.TransactionalOperation {
 		}
 	}
 
-	public get(cancellationToken: CancellationToken, key: string): Promise<string> {
+	public get(executionContext: FExecutionContext, key: string): Promise<string> {
 		this.verifyCompleted();
 
 		const transactionValue: KeyValueDb.Value | undefined = this._transactionDict.get(key);
@@ -211,7 +210,7 @@ class InMemoryTransaction implements KeyValueDb.TransactionalOperation {
 		throw new KeyValueDb.NoSuchKeyError(key);
 	}
 
-	public set(cancellationToken: CancellationToken, key: KeyValueDb.Key, value: KeyValueDb.Value | null): Promise<KeyValueDb.Value | null> {
+	public set(executionContext: FExecutionContext, key: KeyValueDb.Key, value: KeyValueDb.Value | null): Promise<KeyValueDb.Value | null> {
 		this.verifyCompleted();
 
 		const oldTransactionValue: KeyValueDb.Value | undefined = this._transactionDict.get(key);
@@ -239,7 +238,7 @@ class InMemoryTransaction implements KeyValueDb.TransactionalOperation {
 
 	private verifyCompleted(): void {
 		if (this._completed === true) {
-			throw new InvalidOperationError("Wrong operation at current state. Cannot use completed transaction.");
+			throw new FExceptionInvalidOperation("Wrong operation at current state. Cannot use completed transaction.");
 		}
 	}
 }

@@ -3,13 +3,16 @@ npm-debug.log
 node_modules/
 
 # test's output
+allure-results/
+coverage/
+.nyc_output/
+xunit.xml
 
 # Mac files
 .DS_Store
 
 # Build artifacts
 .dist/
-.package/
 src/**/*.d.ts
 src/**/*.js
 src/**/*.map

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const { Container, launcher, registerShutdownHook } = require("@zxteam/launcher");
+const { Flauncher } = require("@freemework/hosting");
+// const { Container  } = require("typescript-ioc");
 
 const fs = require("fs");
 
@@ -21,21 +22,21 @@ console.log(`Package: ${serviceName}@${serviceVersion}\n`);
 // DI Configuration
 //
 
-registerShutdownHook(async function () {
-	await new Promise(function (resolve) {
-		function guardForMissingLoggerCallback() {
-			// This guard resolve promise, if log4js does not call shutdown callback
-			resolve();
-		}
-		const timeout = setTimeout(guardForMissingLoggerCallback, 5000);
-		require('log4js').shutdown(function (log4jsErr) {
-			if (log4jsErr) {
-				console.error("Failure log4js.shutdown:", log4jsErr);
-			}
-			clearTimeout(timeout);
-			resolve();
-		});
-	});
-});
+// registerShutdownHook(async function () {
+// 	await new Promise(function (resolve) {
+// 		function guardForMissingLoggerCallback() {
+// 			// This guard resolve promise, if log4js does not call shutdown callback
+// 			resolve();
+// 		}
+// 		const timeout = setTimeout(guardForMissingLoggerCallback, 5000);
+// 		require('log4js').shutdown(function (log4jsErr) {
+// 			if (log4jsErr) {
+// 				console.error("Failure log4js.shutdown:", log4jsErr);
+// 			}
+// 			clearTimeout(timeout);
+// 			resolve();
+// 		});
+// 	});
+// });
 
-launcher(Configuration.parse, runtimeFactory);
+Flauncher(Configuration.parse, runtimeFactory);

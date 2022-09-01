@@ -14,7 +14,7 @@ messenger_indexer = "bot1"
 	[[approvement.topic]]
 		index = "DeployProduction"
 		description = "Requests to deploy new version of an application."
-		requireVotes = 2
+		requireVotes = 1
 		expireTimeout = 3600
 		#authType = "???TBD???"
 		schema = """
@@ -38,6 +38,5 @@ messenger_indexer = "bot1"
 <b>Do you allow deploy to production?</b>
 <i>Application: </i><b>{{appName}}</b>
 <i>Version: </i><b>{{appVerion}}</b>
-<a href="https://github.com/zxteamorg/messenger-bridge/releases/{{appVerion}}">Release Notes</a>
-<a href="https://github.com/zxteamorg/messenger-bridge/blob/master/CHANGELOG.md">Changelog</a>
+Pls, Igonre this test message (detecting memory leaks)
 """

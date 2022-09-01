@@ -28,6 +28,5 @@ COPY docker/docker-entrypoint.sh ./usr/local/bin/
 FROM ${IMAGE}
 COPY --from=Builder /build/ /
 EXPOSE 8080
-ENV LOG4JS_CONFIG=/etc/zxteamorg/messenger-bridge/log4js.json
 ENTRYPOINT [ "/usr/local/bin/docker-entrypoint.sh" ]
 CMD ["--config-toml-file=/etc/zxteamorg/messenger-bridge/messenger-bridge.toml","--config-env"]

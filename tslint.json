@@ -13,10 +13,7 @@
 			"tabs"
 		],
 		"label-position": true,
-		"max-line-length": [
-			true,
-			140
-		],
+		"max-line-length": false,
 		"member-access": true,
 		"member-ordering": [
 			true,
@@ -35,7 +32,7 @@
 			}
 		],
 		"no-arg": true,
-		"no-bitwise": true,
+		"no-bitwise": false,
 		"no-console": [
 			false,
 			"debug",

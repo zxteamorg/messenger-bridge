@@ -2,7 +2,6 @@
 	"editor.detectIndentation": false,
 	"editor.insertSpaces": false,
 	"editor.lineNumbers": "on",
-	"editor.renderIndentGuides": true,
 	"editor.renderWhitespace": "all",
 	"editor.rulers": [
 		80,
@@ -19,20 +18,23 @@
 	"files.encoding": "utf8",
 	"files.eol": "\n",
 	"files.exclude": {
-		".dist": false,
-		".git": true,
+		".dist": true,
+		".nyc_output": true,
 		".package": true,
+		"coverage": true,
 		"node_modules": true,
 		"src/**/*.d.ts": true,
 		"src/**/*.js": true,
 		"src/**/*.map": true,
-		"test/**/*.d.ts": true,
-		"test/**/*.map": true,
-		"test/**/*.js": true
+		"test/**/*.d.ts":true,
+		"test/**/*.js":true,
+		"test/**/*.map":true,
+		"test.app/**/*.d.ts":true,
+		"test.app/**/*.js":true,
+		"test.app/**/*.map":true
+
 	},
 	"git.enabled": true,
-	"cSpell.words": [
-		"Initable",
-		"approvements"
-	]
+	"git.rebaseWhenSync": true,
+	"editor.guides.indentation": true
 }

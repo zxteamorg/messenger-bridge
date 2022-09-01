@@ -1,8 +1,5 @@
-import { CancellationToken, EventChannel } from "@zxteam/contract";
-import { EventChannelMixin } from "@zxteam/channels";
-import { InvalidOperationError } from "@zxteam/errors";
-import { Initable } from "@zxteam/disposable";
-import { Logger } from "@zxteam/logger";
+import { FCancellationToken, FEventChannel, FEventChannelMixin, FExceptionInvalidOperation, FExecutionContext, FInitableBase, FLogger } from "@freemework/common";
+
 import { Configuration } from "../Configuration";
 
 import { render } from "mustache";
@@ -12,11 +9,10 @@ import { KeyValueDb } from "../misc/KeyValueDb";
 import { ApprovementTopic } from "../model/ApprovementTopic";
 import { Approver } from "../model/Approver";
 
-export abstract class Messenger extends Initable {
+export abstract class Messenger extends FInitableBase {
 	protected readonly _approveEventChannel: ApprovementEventChannelSink;
 	protected readonly _refuseEventChannel: ApprovementEventChannelSink;
 	protected readonly _configuration: Messenger.Configuration;
-	protected readonly _log: Logger;
 	protected readonly _kvDb: KeyValueDb;
 
 	public get approveEventChannel(): Messenger.ApprovementEventChannel { return this._approveEventChannel; }
@@ -28,40 +24,39 @@ export abstract class Messenger extends Initable {
 	}
 
 	public abstract closeApprovementAsApprove(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId,
 		approvers: ReadonlyArray<Approver>
 	): Promise<void>;
 
 	public abstract closeApprovementAsExpired(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId
 	): Promise<void>;
 
 	public abstract closeApprovementAsRefuse(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId,
 		refuser: Approver
 	): Promise<void>;
 
 	public abstract registerApprovement(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementTopicName: ApprovementTopicName,
 		approvementId: ApprovementId,
 		renderData: any
 	): Promise<Messenger.ApprovementMessageToken>;
 
 	public abstract updateApprovement(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId,
 		approvers: ReadonlyArray<Approver>
 	): Promise<void>;
 
-	protected constructor(configuration: Messenger.Configuration, kvDb: KeyValueDb, log: Logger) {
+	protected constructor(configuration: Messenger.Configuration, kvDb: KeyValueDb) {
 		super();
 		this._configuration = configuration;
 		this._kvDb = kvDb;
-		this._log = log;
 		this._approveEventChannel = new ApprovementEventChannelSink();
 		this._refuseEventChannel = new ApprovementEventChannelSink();
 	}
@@ -73,7 +68,7 @@ export abstract class Messenger extends Initable {
 					if (property in renderData) {
 						return renderData[property];
 					}
-					throw new InvalidOperationError(`Non-existing property '${property}'.`);
+					throw new FExceptionInvalidOperation(`Non-existing property '${property}'.`);
 				}
 			}
 		});
@@ -93,25 +88,24 @@ export namespace Messenger {
 	}
 
 
-	export interface ApprovementEvent extends EventChannel.Event<Approver> {
-		readonly cancellationToken: CancellationToken;
+	export interface ApprovementEvent extends FEventChannel.Event<Approver> {
 		readonly sender: Messenger;
 		readonly approvementId: ApprovementId;
 	}
-	export type ApprovementEventChannel = EventChannel<Approver, ApprovementEvent>;
+	export type ApprovementEventChannel = FEventChannel<Approver, ApprovementEvent>;
 
 }
 
 class ApprovementEventChannelSink implements Messenger.ApprovementEventChannel {
 	public async emit(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		sender: Messenger,
 		approvementId: ApprovementId,
 		data: Approver
 	): Promise<void> {
-		await this.notify(Object.freeze({ cancellationToken, sender, approvementId, data }));
+		await this.notify(executionContext, Object.freeze({ sender, approvementId, data }));
 	}
 }
-interface ApprovementEventChannelSink extends EventChannelMixin<Approver, Messenger.ApprovementEvent> { }
-EventChannelMixin.applyMixin(ApprovementEventChannelSink);
+interface ApprovementEventChannelSink extends FEventChannelMixin<Approver, Messenger.ApprovementEvent> { }
+FEventChannelMixin.applyMixin(ApprovementEventChannelSink);
 

@@ -1,35 +1,29 @@
-import { CancellationToken, Logger, SubscriberChannel } from "@zxteam/contract";
-import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
-import { Disposable, Initable } from "@zxteam/disposable";
-import { Ensure, ensureFactory } from "@zxteam/ensure";
-import { InvalidOperationError, wrapErrorIfNeeded } from "@zxteam/errors";
-import { Configuration as HostingConfiguration, WebServer, WebSocketChannelFactoryEndpoint } from "@zxteam/hosting";
-import { Inject } from "@zxteam/launcher";
+import { FEnsure, FExceptionInvalidOperation, FExecutionContext } from "@freemework/common";
+import { FHostingConfiguration, FWebServer, FWebSocketChannelFactoryEndpoint } from "@freemework/hosting";
 
 import * as WebSocket from "ws";
 import { Service } from "../Service";
 
 //import { fromBuffer, toBuffer } from "../util/ArrayBufferUtils";
 
-const ensure: Ensure = ensureFactory();
+const ensure: FEnsure = FEnsure.create();
 
-export class WSEndpoint extends WebSocketChannelFactoryEndpoint {
+export class WSEndpoint extends FWebSocketChannelFactoryEndpoint {
 	private readonly _service: Service;
 
 	public constructor(
-		servers: ReadonlyArray<WebServer>,
-		opts: HostingConfiguration.WebSocketEndpoint,
-		log: Logger,
+		servers: ReadonlyArray<FWebServer>,
+		opts: FHostingConfiguration.WebSocketEndpoint,
 		service: Service
 	) {
-		super(servers, opts, log);
+		super(servers, opts);
 		this._service = service;
 	}
 
 	public async createBinaryChannel(
-		cancellationToken: CancellationToken, webSocket: WebSocket, subProtocol: string
-	): Promise<WebSocketChannelFactoryEndpoint.BinaryChannel> {
-		throw new InvalidOperationError("Not implemented yet");
+		executionContext: FExecutionContext, webSocket: WebSocket, subProtocol: string
+	): Promise<FWebSocketChannelFactoryEndpoint.BinaryChannel> {
+		throw new FExceptionInvalidOperation("Not implemented yet");
 	}
 }
 

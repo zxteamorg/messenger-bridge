@@ -1,9 +1,4 @@
-import { CancellationToken, Logger } from "@zxteam/contract";
-import { DUMMY_CANCELLATION_TOKEN, ManualCancellationTokenSource } from "@zxteam/cancellation";
-import { Disposable, using } from "@zxteam/disposable";
-import { ensureFactory, Ensure, EnsureError } from "@zxteam/ensure";
-import { ArgumentError, CancelledError, InvalidOperationError, wrapErrorIfNeeded } from "@zxteam/errors";
-import { WebClient } from "@zxteam/web-client";
+import { FCancellationToken, FLogger, FCancellationTokenSourceManual, FEnsure, FEnsureException, FExceptionInvalidOperation, Fusing, FExceptionArgument, FExecutionContext, FExceptionCancelled, FException, FDisposableBase, FWebClient, FHttpClient, FExecutionContextCancellation, FExecutionContextLogger } from "@freemework/common";
 
 import * as _ from "lodash";
 
@@ -15,17 +10,17 @@ import { KeyValueDb } from "../misc/KeyValueDb";
 import { ApprovementTopic } from "../model/ApprovementTopic";
 import { Approver } from "../model/Approver";
 
-const approvementMessageTokenEnsure: Ensure = ensureFactory((message, data) => {
+const approvementMessageTokenEnsure: FEnsure = FEnsure.create((message, data) => {
 	throw new TelegramMessenger.ApprovementMessageTokenError(message, data);
 });
-const protocolEnsure: Ensure = ensureFactory((message, data) => {
+const protocolEnsure: FEnsure = FEnsure.create((message, data) => {
 	throw new TelegramMessenger.TelegramProtocolError(message, data);
 });
 
 export class TelegramMessenger extends Messenger {
 	private readonly _workerSleepMs: TelegramMessenger.Opts["workerSleepMs"];
 	private readonly _telegram: TelegramApiClient;
-	private readonly _disposeCancellationTokenSource: ManualCancellationTokenSource;
+	private readonly _disposeCancellationTokenSource: FCancellationTokenSourceManual;
 	private readonly _chatTopics: Map<
 		TelegramApiClientInternal.ChatId,
 		Configuration.Messenger.Common.ApprovementTopicBinding["bindTopic"]
@@ -37,18 +32,18 @@ export class TelegramMessenger extends Messenger {
 	public constructor(
 		opts: TelegramMessenger.Opts,
 		configuration: TelegramMessenger.Configuration,
-		kvDb: KeyValueDb, log: Logger
+		kvDb: KeyValueDb
 	) {
 		if (opts.workerSleepMs < 240 || opts.workerSleepMs > 60000) {
-			throw new ArgumentError(
-				"opts.workerSleepMs",
-				`Wrong workerSleepMs value: ${opts.workerSleepMs}. Expected a value in range [240..60000].`
+			throw new FExceptionArgument(
+				`Wrong workerSleepMs value: ${opts.workerSleepMs}. Expected a value in range [240..60000].`,
+				"opts.workerSleepMs"
 			);
 		}
 
-		super(configuration, kvDb, log.getLogger(configuration.name));
+		super(configuration, kvDb);
 
-		this._disposeCancellationTokenSource = new ManualCancellationTokenSource();
+		this._disposeCancellationTokenSource = new FCancellationTokenSourceManual();
 		this._workerSleepMs = opts.workerSleepMs;
 		this._workerTimeout = null;
 		this._safeWorkerTask = null;
@@ -64,12 +59,12 @@ export class TelegramMessenger extends Messenger {
 	public get name(): string { return this._configuration.name; }
 
 	public async closeApprovementAsApprove(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId,
 		approvers: ReadonlyArray<Approver>
 	): Promise<void> {
 		const approvementMessageToken: Messenger.ApprovementMessageToken = await this._kvDb.get(
-			cancellationToken,
+			executionContext,
 			this.formatKey__approvementMessageToken_by_approvementId(approvementId)
 		);
 
@@ -79,21 +74,23 @@ export class TelegramMessenger extends Messenger {
 
 		const approvementTopicName: ApprovementTopicName | undefined = this._chatTopics.get(chat_id);
 		if (approvementTopicName === undefined) {
-			throw new ArgumentError("approvementId",
-				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`);
+			throw new FExceptionArgument(
+				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`,
+				"approvementId"
+			);
 		}
 
 		const approvementTopic: ApprovementTopic | undefined
 			= this._configuration.approvementTopics.get(approvementTopicName);
 
 		if (approvementTopic === undefined) {
-			throw new InvalidOperationError(
+			throw new FExceptionInvalidOperation(
 				`Wrong operation. Messenger '${this.name}' does not have binding to the approvement topic '${approvementTopicName}'.`
 			);
 		}
 
 		const messageContent: string = await this._kvDb
-			.get(cancellationToken, this.formatKey__messageContent_by_approvementId(approvementId));
+			.get(executionContext, this.formatKey__messageContent_by_approvementId(approvementId));
 
 		const approverNames: Array<string> = approvers
 			.filter((approver: Approver): approver is Approver.Telegram => approver.source === "telegram")
@@ -107,7 +104,7 @@ export class TelegramMessenger extends Messenger {
 			)
 			: messageContent;
 
-		await this._telegram.editMessageText(cancellationToken, {
+		await this._telegram.editMessageText(executionContext, {
 			chat_id, message_id,
 			text: approvedMessageContent,
 			parse_mode: "HTML", disable_web_page_preview: true
@@ -115,11 +112,11 @@ export class TelegramMessenger extends Messenger {
 	}
 
 	public async closeApprovementAsExpired(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId
 	): Promise<void> {
 		const approvementMessageToken: Messenger.ApprovementMessageToken = await this._kvDb.get(
-			cancellationToken,
+			executionContext,
 			this.formatKey__approvementMessageToken_by_approvementId(approvementId)
 		);
 
@@ -129,25 +126,27 @@ export class TelegramMessenger extends Messenger {
 
 		const approvementTopicName: ApprovementTopicName | undefined = this._chatTopics.get(chat_id);
 		if (approvementTopicName === undefined) {
-			throw new ArgumentError("approvementId",
-				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`);
+			throw new FExceptionArgument(
+				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`,
+				"approvementId"
+			);
 		}
 
 		const approvementTopic: ApprovementTopic | undefined
 			= this._configuration.approvementTopics.get(approvementTopicName);
 
 		if (approvementTopic === undefined) {
-			throw new InvalidOperationError(
+			throw new FExceptionInvalidOperation(
 				`Wrong operation. Messenger '${this.name}' does not have binding to the approvement topic '${approvementTopicName}'.`
 			);
 		}
 
 		const messageContent: string = await this._kvDb
-			.get(cancellationToken, this.formatKey__messageContent_by_approvementId(approvementId));
+			.get(executionContext, this.formatKey__messageContent_by_approvementId(approvementId));
 
 		const expiredMessageContent: string = messageContent.endsWith("\n") ? `${messageContent}<i>Expired</i>` : `${messageContent}\n<i>Expired</i>`;
 
-		await this._telegram.editMessageText(cancellationToken, {
+		await this._telegram.editMessageText(executionContext, {
 			chat_id, message_id,
 			text: expiredMessageContent,
 			parse_mode: "HTML", disable_web_page_preview: true
@@ -155,12 +154,12 @@ export class TelegramMessenger extends Messenger {
 	}
 
 	public async closeApprovementAsRefuse(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId,
 		refuser: Approver
 	): Promise<void> {
 		const approvementMessageToken: Messenger.ApprovementMessageToken = await this._kvDb.get(
-			cancellationToken,
+			executionContext,
 			this.formatKey__approvementMessageToken_by_approvementId(approvementId)
 		);
 
@@ -170,21 +169,23 @@ export class TelegramMessenger extends Messenger {
 
 		const approvementTopicName: ApprovementTopicName | undefined = this._chatTopics.get(chat_id);
 		if (approvementTopicName === undefined) {
-			throw new ArgumentError("approvementId",
-				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`);
+			throw new FExceptionArgument(
+				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`,
+				"approvementId"
+			);
 		}
 
 		const approvementTopic: ApprovementTopic | undefined
 			= this._configuration.approvementTopics.get(approvementTopicName);
 
 		if (approvementTopic === undefined) {
-			throw new InvalidOperationError(
+			throw new FExceptionInvalidOperation(
 				`Wrong operation. Messenger '${this.name}' does not have binding to the approvement topic '${approvementTopicName}'.`
 			);
 		}
 
 		const messageContent: string = await this._kvDb
-			.get(cancellationToken, this.formatKey__messageContent_by_approvementId(approvementId));
+			.get(executionContext, this.formatKey__messageContent_by_approvementId(approvementId));
 
 		const refusedMessageContent: string = refuser.source === "telegram"
 			? (
@@ -194,7 +195,7 @@ export class TelegramMessenger extends Messenger {
 			)
 			: messageContent;
 
-		await this._telegram.editMessageText(cancellationToken, {
+		await this._telegram.editMessageText(executionContext, {
 			chat_id, message_id,
 			text: refusedMessageContent,
 			parse_mode: "HTML", disable_web_page_preview: true
@@ -202,7 +203,7 @@ export class TelegramMessenger extends Messenger {
 	}
 
 	public async registerApprovement(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementTopicName: ApprovementTopicName,
 		approvementId: ApprovementId,
 		renderData: any
@@ -216,24 +217,24 @@ export class TelegramMessenger extends Messenger {
 			= this._configuration.approvementTopics.get(approvementTopicName);
 
 		if (approvementTopicBinding === undefined || approvementTopic === undefined) {
-			throw new InvalidOperationError(
+			throw new FExceptionInvalidOperation(
 				`Wrong operation. Messenger '${this.name}' does not have binding to the approvement topic '${approvementTopicName}'.`
 			);
 		}
 
 		const messageContent: string = Messenger.renderMessageContent(approvementTopicBinding.renderTemplate, renderData);
 
-		await using(cancellationToken, () => this._kvDb.transaction(cancellationToken), async (__, db) => {
+		await Fusing(executionContext, () => this._kvDb.transaction(executionContext), async (__, db) => {
 			const key: KeyValueDb.Key = this.formatKey__messageContent_by_approvementId(approvementId);
-			const duplicateMessageContent: KeyValueDb.Value | null = await db.find(cancellationToken, key);
+			const duplicateMessageContent: KeyValueDb.Value | null = await db.find(executionContext, key);
 			if (duplicateMessageContent !== null) {
-				throw new InvalidOperationError(`Duplicate approvementId: '${approvementId}'.`);
+				throw new FExceptionInvalidOperation(`Duplicate approvementId: '${approvementId}'.`);
 			}
-			await db.set(cancellationToken, key, messageContent);
-			await db.commit(cancellationToken);
+			await db.set(executionContext, key, messageContent);
+			await db.commit(executionContext);
 		});
 
-		const message: TelegramApiClientInternal.Message = await this._telegram.sendMessage(cancellationToken, {
+		const message: TelegramApiClientInternal.Message = await this._telegram.sendMessage(executionContext, {
 			chat_id: approvementTopicBinding.chatId,
 			text: messageContent,
 			parse_mode: "HTML",
@@ -249,31 +250,31 @@ export class TelegramMessenger extends Messenger {
 			message_id: message.message_id
 		});
 
-		await using(cancellationToken, () => this._kvDb.transaction(cancellationToken), async (__, db) => {
+		await Fusing(executionContext, () => this._kvDb.transaction(executionContext), async (__, db) => {
 			await db.set(
-				cancellationToken,
+				executionContext,
 				this.formatKey__approvementMessageToken_by_approvementId(approvementId),
 				approvementMessageToken
 			);
 			await db.set(
-				cancellationToken,
+				executionContext,
 				this.formatKey__approvementId_by_approvementMessageToken(approvementMessageToken),
 				`${approvementId}`
 			);
-			await db.commit(cancellationToken);
+			await db.commit(executionContext);
 		});
 
 		return approvementMessageToken;
 	}
 
 	public async updateApprovement(
-		cancellationToken: CancellationToken,
+		executionContext: FExecutionContext,
 		approvementId: ApprovementId,
 		approvers: ReadonlyArray<Approver>
 	): Promise<void> {
 
 		const approvementMessageToken: Messenger.ApprovementMessageToken = await this._kvDb.get(
-			cancellationToken,
+			executionContext,
 			this.formatKey__approvementMessageToken_by_approvementId(approvementId)
 		);
 
@@ -283,20 +284,22 @@ export class TelegramMessenger extends Messenger {
 
 		const approvementTopicName: ApprovementTopicName | undefined = this._chatTopics.get(chat_id);
 		if (approvementTopicName === undefined) {
-			throw new ArgumentError("approvementId",
-				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`);
+			throw new FExceptionArgument(
+				`Messenger '${this.name}' does not have related topic to approvementId: '${approvementId}'.`,
+				"approvementId"
+			);
 		}
 
 		const approvementTopic: ApprovementTopic | undefined
 			= this._configuration.approvementTopics.get(approvementTopicName);
 
 		if (approvementTopic === undefined) {
-			throw new InvalidOperationError(
+			throw new FExceptionInvalidOperation(
 				`Wrong operation. Messenger '${this.name}' does not have binding to the approvement topic '${approvementTopicName}'.`
 			);
 		}
 
-		await this._telegram.editMessageReplyMarkup(cancellationToken, {
+		await this._telegram.editMessageReplyMarkup(executionContext, {
 			chat_id, message_id,
 			reply_markup: {
 				inline_keyboard: TelegramMessenger.formatInlineKeyboard(approvementTopic.requireVotes, approvers.length)
@@ -304,14 +307,18 @@ export class TelegramMessenger extends Messenger {
 		});
 	}
 
-	protected async onInit(cancellationToken: CancellationToken): Promise<void> {
-		this._log.debug("Initializing...");
+	protected async onInit(): Promise<void> {
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+		logger.debug("Initializing...");
 		this._workerTimeout = setTimeout(this._backgroundWorker, this._workerSleepMs);
-		this._log.debug("Initialized.");
+		logger.debug("Initialized.");
 	}
 
 	protected async onDispose(): Promise<void> {
-		this._log.debug("Disposing...");
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+		logger.debug("Disposing...");
 
 		if (this._workerTimeout !== null) {
 			clearTimeout(this._workerTimeout);
@@ -324,7 +331,7 @@ export class TelegramMessenger extends Messenger {
 			await this._safeWorkerTask;
 		}
 
-		this._log.debug("Disposed");
+		logger.debug("Disposed");
 	}
 
 	private get configuration(): TelegramMessenger.Configuration {
@@ -335,21 +342,23 @@ export class TelegramMessenger extends Messenger {
 	private _backgroundWorker(): void {
 		if (this.disposing || this.disposed) { return; }
 
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
 		if (this._safeWorkerTask) {
-			this._log.error("[BUG] Illegal operation at current state. Previous worker is not completed yet.");
+			logger.error("[BUG] Illegal operation at current state. Previous worker is not completed yet.");
 			return;
 		}
 
 		this._safeWorkerTask = this._backgroundWorkerJob()
 			.catch(reason => {
-				if (reason instanceof CancelledError) {
-					this._log.debug("Worker job was cancelled.");
+				if (reason instanceof FExceptionCancelled) {
+					logger.debug("Worker job was cancelled.");
 					return;
 				}
 
-				const err = wrapErrorIfNeeded(reason);
-				if (this._log.isInfoEnabled) { this._log.info(`Worker job failure. Error: ${err.message}`); }
-				this._log.trace(`Worker job failure.`, err);
+				const err = FException.wrapIfNeeded(reason);
+				if (logger.isInfoEnabled) { logger.info(`Worker job failure. Error: ${err.message}`); }
+				logger.trace(`Worker job failure.`, err);
 			})
 			.finally(() => {
 				this._safeWorkerTask = null;
@@ -366,19 +375,30 @@ export class TelegramMessenger extends Messenger {
 				//
 			};
 
-		const updatesData = await this._telegram.getUpdates(this._disposeCancellationTokenSource.token, opts);
+
+		const executionContext: FExecutionContext = new FExecutionContextCancellation(
+			FExecutionContext.None,
+			this._disposeCancellationTokenSource.token
+		);
+
+		const logger: FLogger = FExecutionContextLogger.of(executionContext).logger;
+
+		const updatesData = await this._telegram.getUpdates(
+			executionContext,
+			opts
+		);
 
 		for (const update of updatesData) {
 			try {
 				if (update.message !== undefined) {
 					console.log(update.message);
 				} else if (update.callback_query !== undefined) {
-					await this._onUpdateCallbackQuery(DUMMY_CANCELLATION_TOKEN, update.callback_query);
+					await this._onUpdateCallbackQuery(FExecutionContext.None, update.callback_query);
 				} else {
-					this._log.debug(`Skip unsupported update: ${JSON.stringify(update)}`);
+					logger.debug(`Skip unsupported update: ${JSON.stringify(update)}`);
 				}
 			} catch (e) {
-				this._log.warn(e);
+				logger.warn(e as any);
 			}
 
 			this._latestProcessedUpdateId = this._latestProcessedUpdateId !== null
@@ -386,12 +406,12 @@ export class TelegramMessenger extends Messenger {
 				: this._latestProcessedUpdateId = update.update_id;
 		}
 
-		if (this._log.isInfoEnabled) {
-			this._log.info(`${updatesData.length} updates processed`);
+		if (logger.isInfoEnabled) {
+			logger.info(`${updatesData.length} updates processed`);
 		}
 	}
 
-	private async _onUpdateCallbackQuery(cancellationToken: CancellationToken, data: TelegramApiClientInternal.CallbackQuery): Promise<void> {
+	private async _onUpdateCallbackQuery(executionContext: FExecutionContext, data: TelegramApiClientInternal.CallbackQuery): Promise<void> {
 
 		const answerData: string = (data as any).data;
 		const chat_id: string = (data as any).message.chat.id.toString();
@@ -401,10 +421,12 @@ export class TelegramMessenger extends Messenger {
 		const message_date_unix: number = (data as any).message.date;
 		const username: string = (data as any).from.username;
 
+		const logger: FLogger = FExecutionContextLogger.of(executionContext).logger;
+
 		const topicName = this._chatTopics.get(chat_id);
 		if (topicName === undefined) {
-			if (this._log.isDebugEnabled) {
-				this._log.debug(
+			if (logger.isDebugEnabled) {
+				logger.debug(
 					`Skip CallbackQuery update due related topic was not found by chat_id: ${chat_id}`
 				);
 			}
@@ -412,8 +434,8 @@ export class TelegramMessenger extends Messenger {
 		}
 		const bindingConfiguration = this._configuration.approvementTopicBindings.get(topicName);
 		if (bindingConfiguration === undefined) {
-			if (this._log.isDebugEnabled) {
-				this._log.debug(
+			if (logger.isDebugEnabled) {
+				logger.debug(
 					`Skip CallbackQuery update due related bindingConfiguration was not found by topicName: ${topicName}`
 				);
 			}
@@ -426,10 +448,10 @@ export class TelegramMessenger extends Messenger {
 		});
 
 		const approvementId: ApprovementId | null = await this._kvDb
-			.find(cancellationToken, this.formatKey__approvementId_by_approvementMessageToken(approvementMessageToken));
+			.find(executionContext, this.formatKey__approvementId_by_approvementMessageToken(approvementMessageToken));
 		if (approvementId === null) {
-			if (this._log.isDebugEnabled) {
-				this._log.debug(
+			if (logger.isDebugEnabled) {
+				logger.debug(
 					`Skip CallbackQuery update due related approvementId was not found by chat_id: ${chat_id} and message_id: ${message_id}`
 				);
 			}
@@ -442,17 +464,27 @@ export class TelegramMessenger extends Messenger {
 			)
 		);
 		if (answerData === TelegramApiClientInternal.ApprovementVote.APPROVE) {
-			await this._approveEventChannel.emit(cancellationToken, this, approvementId, approver);
+			await this._approveEventChannel.emit(executionContext, this, approvementId, approver);
 		} else if (answerData === TelegramApiClientInternal.ApprovementVote.REFUSE) {
-			await this._refuseEventChannel.emit(cancellationToken, this, approvementId, approver);
+			await this._refuseEventChannel.emit(executionContext, this, approvementId, approver);
 		} else {
-			throw new InvalidOperationError(`Unexpected answer data '${answerData}'.`);
+			throw new FExceptionInvalidOperation(`Unexpected answer data '${answerData}'.`);
 		}
 	}
 
 	private static formatInlineKeyboard(requireVotes: number, approvedVotes: number) {
-		if (requireVotes < 0) { throw new ArgumentError("requireVotes", "Value should be positive of zero."); }
-		if (approvedVotes < 0) { throw new ArgumentError("approvedVotes", "Value should be positive of zero."); }
+		if (requireVotes < 0) {
+			throw new FExceptionArgument(
+				"Value should be positive of zero.",
+				"requireVotes",
+			);
+		}
+		if (approvedVotes < 0) {
+			throw new FExceptionArgument(
+				"Value should be positive of zero.",
+				"approvedVotes",
+			);
+		}
 		return Object.freeze([
 			Object.freeze([
 				Object.freeze({
@@ -490,8 +522,8 @@ export namespace TelegramMessenger {
 		readonly approvementTopics: Map<ApprovementTopicName, ApprovementTopic>;
 	}
 
-	export class ApprovementMessageTokenError extends EnsureError { }
-	export class TelegramProtocolError extends EnsureError { }
+	export class ApprovementMessageTokenError extends FEnsureException { }
+	export class TelegramProtocolError extends FEnsureException { }
 }
 
 namespace TelegramMessengerInternal {
@@ -526,7 +558,7 @@ namespace TelegramMessengerInternal {
 /**
  * API client for https://core.telegram.org/bots/api
  */
-class TelegramApiClient extends Disposable {
+class TelegramApiClient extends FDisposableBase {
 	private readonly _webClient: TelegramApiClientInternal.TelegramWebClient;
 
 	public constructor(opts: TelegramApiClient.Opts) {
@@ -545,7 +577,7 @@ class TelegramApiClient extends Disposable {
 	/**
 	 * https://core.telegram.org/bots/api#editmessagereplymarkup
 	 */
-	public async editMessageReplyMarkup(cancellationToken: CancellationToken, data: {
+	public async editMessageReplyMarkup(executionContext: FExecutionContext, data: {
 		readonly chat_id?: string;
 		readonly message_id?: number;
 		readonly inline_message_id?: string;
@@ -553,16 +585,18 @@ class TelegramApiClient extends Disposable {
 		//| TelegramApiClientInternal.ReplyKeyboardRemove | TelegramApiClientInternal.ForceReply
 	}) {
 		try {
-			const response: WebClient.Response = await this._webClient
-				.postJson(cancellationToken, "editMessageReplyMarkup", data);
+			const response: FWebClient.Response = await this._webClient
+				.postJson(executionContext, "editMessageReplyMarkup", data);
 			return response.bodyAsJson;
 		} catch (e) {
-			console.error(e.body.toString());
+			if (e instanceof FHttpClient.WebError) {
+				console.error(e.body.toString());
+			}
 			throw e;
 		}
 	}
 
-	public async editMessageText(cancellationToken: CancellationToken, data: {
+	public async editMessageText(executionContext: FExecutionContext, data: {
 		/**
 		 * Required if inline_message_id is not specified. Unique identifier for the target chat
 		 * or username of the target channel (in the format @channelusername)
@@ -596,23 +630,25 @@ class TelegramApiClient extends Disposable {
 		//| TelegramApiClientInternal.ReplyKeyboardRemove | TelegramApiClientInternal.ForceReply
 	}) {
 		try {
-			const response: WebClient.Response = await this._webClient.postJson(cancellationToken, "editMessageText", data);
+			const response: FWebClient.Response = await this._webClient.postJson(executionContext, "editMessageText", data);
 			return response.bodyAsJson.result;
 		} catch (e) {
-			console.error(e.body.toString());
+			if (e instanceof FHttpClient.WebError) {
+				console.error(e.body.toString());
+			}
 			throw e;
 		}
 	}
 
-	public async getMe(cancellationToken: CancellationToken): Promise<any> {
-		const response: WebClient.Response = await this._webClient.get(cancellationToken, "getMe");
+	public async getMe(executionContext: FExecutionContext): Promise<any> {
+		const response: FWebClient.Response = await this._webClient.get(executionContext, "getMe");
 		return response.bodyAsJson;
 	}
 
 	/**
 	 * https://core.telegram.org/bots/api#getupdates
 	 */
-	public async getUpdates(cancellationToken: CancellationToken, data?: {
+	public async getUpdates(executionContext: FExecutionContext, data?: {
 		/**
 		 * Identifier of the first update to be returned. Must be greater by one than the highest
 		 * among the identifiers of previously received updates.
@@ -654,7 +690,7 @@ class TelegramApiClient extends Disposable {
 			}
 		}
 
-		const response: WebClient.Response = await this._webClient.get(cancellationToken, "getUpdates", {
+		const response: FWebClient.Response = await this._webClient.get(executionContext, "getUpdates", {
 			queryArgs
 		});
 
@@ -685,7 +721,7 @@ class TelegramApiClient extends Disposable {
 		return result;
 	}
 
-	public async sendMessage(cancellationToken: CancellationToken, data: {
+	public async sendMessage(executionContext: FExecutionContext, data: {
 		/**
 		 * 	Unique identifier for the target chat or username of the target channel (in the format @channelusername).
 		 */
@@ -718,10 +754,12 @@ class TelegramApiClient extends Disposable {
 		//| TelegramApiClientInternal.ReplyKeyboardRemove | TelegramApiClientInternal.ForceReply
 	}): Promise<TelegramApiClientInternal.Message> {
 		try {
-			const response: WebClient.Response = await this._webClient.postJson(cancellationToken, "sendMessage", data);
+			const response: FWebClient.Response = await this._webClient.postJson(executionContext, "sendMessage", data);
 			return response.bodyAsJson.result;
 		} catch (e) {
-			console.error(e.body.toString());
+			if (e instanceof FHttpClient.WebError) {
+				console.error(e.body.toString());
+			}
 			throw e;
 		}
 	}
@@ -741,9 +779,9 @@ export namespace TelegramApiClient {
 }
 
 namespace TelegramApiClientInternal {
-	export class TelegramWebClient extends WebClient {
-		public postJson(cancellationToken: CancellationToken, urlPath: string, data: any): Promise<WebClient.Response> {
-			return super.invoke(cancellationToken, urlPath, "POST", {
+	export class TelegramWebClient extends FWebClient {
+		public postJson(executionContext: FExecutionContext, urlPath: string, data: any): Promise<FWebClient.Response> {
+			return super.invoke(executionContext, urlPath, "POST", {
 				headers: {
 					"Content-Type": "application/json"
 				},

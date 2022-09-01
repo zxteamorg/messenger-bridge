@@ -1,23 +1,18 @@
-import { Initable } from "@zxteam/disposable";
-import { Inject, Provides, Singleton } from "@zxteam/launcher";
-import { logger } from "@zxteam/logger";
-import * as hosting from "@zxteam/hosting";
+import { FExecutionContextLogger, FInitableBase, FLogger } from "@freemework/common";
+import { createWebServer, FWebServer, instanceofWebServer } from "@freemework/hosting";
 
 import * as express from "express";
 import * as _ from "lodash";
+import { Container, Provides, Singleton } from "typescript-ioc";
 
 import { ConfigurationProvider } from "./ConfigurationProvider";
-import { Logger, CancellationToken } from "@zxteam/contract";
 
 @Singleton
-export abstract class HostingProvider extends Initable {
+export abstract class HostingProvider extends FInitableBase {
 	public abstract get serverInstances(): ReadonlyArray<HostingProvider.ServerInstance>;
-
-	protected readonly log: Logger;
 
 	public constructor() {
 		super();
-		this.log = logger.getLogger("HostingProvider");
 	}
 
 	public abstract finalizeConfiguration(): void;
@@ -25,30 +20,30 @@ export abstract class HostingProvider extends Initable {
 export namespace HostingProvider {
 	export interface ServerInstance {
 		readonly name: string;
-		readonly server: hosting.WebServer;
+		readonly server: FWebServer;
 		readonly isOwnInstance: boolean;
 	}
 }
 
 @Provides(HostingProvider)
 class HostingProviderImpl extends HostingProvider {
-	@Inject
 	private readonly configProvider!: ConfigurationProvider;
 
-	private readonly _serverInstances: Array<{ name: string, server: hosting.WebServer, isOwnInstance: boolean }>;
+	private readonly _serverInstances: Array<{ name: string, server: FWebServer, isOwnInstance: boolean }>;
 	private readonly _destroyHandlers: Array<() => Promise<void>>;
 	private _isConfigured: boolean;
 
 	public constructor() {
 		super();
 
-		this.log.info("Constructing Web servers...");
+		this.configProvider = Container.get(ConfigurationProvider);
+
 		this._serverInstances = [...this.configProvider.servers.values()].map((serverOpts) => {
-			if (hosting.instanceofWebServer(serverOpts)) {
+			if (instanceofWebServer(serverOpts)) {
 				return { name: serverOpts.name, server: serverOpts, isOwnInstance: false };
 			}
 
-			const ownServerInstance = hosting.createWebServer(serverOpts, this.log);
+			const ownServerInstance = createWebServer(serverOpts);
 
 			return Object.freeze({ name: ownServerInstance.name, server: ownServerInstance, isOwnInstance: true });
 		});
@@ -63,25 +58,27 @@ class HostingProviderImpl extends HostingProvider {
 	public finalizeConfiguration(): void {
 		for (const serverInstance of _.values(this._serverInstances)) {
 			if (serverInstance.isOwnInstance === true) {
-				setupExpressErrorHandles(serverInstance.server.rootExpressApplication, this.log);
+				setupExpressErrorHandles(serverInstance.server.rootExpressApplication);
 			}
 		}
 		this._isConfigured = true;
 	}
 
 
-	protected async onInit(cancellationToken: CancellationToken): Promise<void> {
-		this.log.info("Initializing Web servers...");
+	protected async onInit(): Promise<void> {
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
 
-		const serversMap: { readonly [serverName: string]: { server: hosting.WebServer, isOwnInstance: boolean } }
+		logger.info("Initializing Web servers...");
+
+		const serversMap: { readonly [serverName: string]: { server: FWebServer, isOwnInstance: boolean } }
 			= _.keyBy(this._serverInstances, "name");
 
 		const { name: serviceName, version: serviceVersion } = require("../../package.json");
 
 		try {
 			for (const serverInfo of _.values(serversMap)) {
-				if (this.log.isInfoEnabled) {
-					this.log.info(`Start server: ${serverInfo.server.name}`);
+				if (logger.isInfoEnabled) {
+					logger.info(`Start server: ${serverInfo.server.name}`);
 				}
 
 				const expressApplication = serverInfo.server.rootExpressApplication;
@@ -103,7 +100,7 @@ class HostingProviderImpl extends HostingProvider {
 					}
 				});
 
-				await serverInfo.server.init(cancellationToken);
+				await serverInfo.server.init(this.initExecutionContext);
 				this._destroyHandlers.push(() => serverInfo.server.dispose().catch(console.error));
 			}
 		} catch (e) {
@@ -117,7 +114,10 @@ class HostingProviderImpl extends HostingProvider {
 	}
 
 	protected async onDispose(): Promise<void> {
-		this.log.info("Disposinig Web servers...");
+		const logger: FLogger = FExecutionContextLogger.of(this.initExecutionContext).logger;
+
+		logger.info("Disposinig Web servers...");
+
 		let destroyHandler;
 		while ((destroyHandler = this._destroyHandlers.pop()) !== undefined) {
 			await destroyHandler();
@@ -126,7 +126,7 @@ class HostingProviderImpl extends HostingProvider {
 }
 
 
-export function setupExpressErrorHandles(app: express.Application, log: Logger): void {
+export function setupExpressErrorHandles(app: express.Application): void {
 	// 404 Not found (bad URL)
 	app.use(function (req: express.Request, res: express.Response) { res.status(404).end("404 Not Found"); });
 
@@ -134,7 +134,7 @@ export function setupExpressErrorHandles(app: express.Application, log: Logger):
 	app.use(function (err: any, req: express.Request, res: express.Response, next: express.NextFunction): any {
 		if (err) {
 			//TODO: send email, log err, etc...
-			log.error(err);
+			console.error(err);
 		}
 		//return res.status(500).end("500 Internal Error");
 		return next(err); // use express exception render

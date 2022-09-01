@@ -22,38 +22,36 @@
 	],
 	"license": "MIT",
 	"devDependencies": {
-		"@types/lodash": "^4.14.149",
-		"@types/mustache": "^4.0.1",
-		"@types/uuid": "^8.3.0",
-		"@zxnode/build": "^0.0.38"
+		"@types/lodash": "^4.14.184",
+		"@types/chai": "^4.3.1",
+		"@types/mocha": "^9.1.1",
+		"@types/mustache": "^4.2.1",
+		"@types/uuid": "^8.3.4",
+		"chai": "^4.3.6",
+		"mocha": "^10.0.0",
+		"nyc": "^15.1.0",
+		"source-map-support": "^0.5.21",
+		"typescript": "^4.8.2"
 	},
 	"dependencies": {
-		"@zxteam/cancellation": "^6.0.62",
-		"@zxteam/channels": "^6.0.62",
-		"@zxteam/configuration": "^6.0.64",
-		"@zxteam/contract": "^6.0.62",
-		"@zxteam/disposable": "^6.0.63",
-		"@zxteam/ensure": "^6.0.63",
-		"@zxteam/hosting": "^6.0.63",
-		"@zxteam/launcher": "^6.0.64",
-		"@zxteam/logger": "^6.0.63",
-		"@zxteam/web-client": "^6.0.62",
-		"express": "^4.17.1",
-		"lodash": "^4.17.20",
-		"mustache": "^4.0.1",
-		"uuid": "^8.3.1"
+		"@freemework/common": "^0.6.1",
+		"@freemework/hosting": "^0.6.1",
+		"express": "^4.18.1",
+		"lodash": "^4.17.21",
+		"mustache": "^4.2.0",
+		"typescript-ioc": "^1.2.6",
+		"uuid": "^8.3.2"
 	},
 	"engines": {
-		"node": ">=11"
+		"node": ">=16.0.0 <19"
 	},
 	"keywords": [],
 	"scripts": {
-		"start": "node ./src/app.js --config=\"app.config\"",
-		"clean": "zxbuild clean",
-		"compile": "zxbuild compile:src",
-		"build": "zxbuild clean && zxbuild dist && cp README.md package-lock.json .dist/ && cp -r bin/ .dist/",
-		"test": "nyc --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha \"test/**/*.test.js\" --recursive",
-		"test:only": "mocha --require source-map-support/register \"test/**/*.test.js\" --recursive"
+		"clean": "find src \\( -name '*.js' -o -name '*.d.ts' -o -name '*.map' \\) -exec rm {} \\; ; find test \\( -name '*.js' -o -name '*.d.ts' -o -name '*.map' \\) -exec rm {} \\;",
+		"build": "tsc",
+		"build:package": "rm -rf lib && tsc --project tsconfig-package.json && cp README.md .dist/ && jq '{ name: .name, version: .version, description: .description, author: .author, contributors: .contributors, license: .license, keywords: .keywords, repository: .repository, bugs: .bugs, engines: .engines, homepage: .homepage, main: \"lib/index.js\", types: \"lib/index.d.ts\", dependencies: .dependencies }' package.json > .dist/package.json",
+		"test": "tsc && nyc --exclude submodules --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha --require source-map-support/register --recursive --timeout 10000 \"test/**/*.test.js\"",
+		"test:only": "tsc && mocha --require source-map-support/register \"test/**/*.test.js\" --recursive --timeout 10000"
 	},
 	"private": true
 }
