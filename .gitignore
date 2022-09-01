@@ -13,9 +13,9 @@ xunit.xml
 
 # Build artifacts
 .dist/
-src/**/*.d.ts
-src/**/*.js
-src/**/*.map
+lib/**/*.d.ts
+lib/**/*.js
+lib/**/*.map
 test/**/*.d.ts
 test/**/*.js
 test/**/*.map

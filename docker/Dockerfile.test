@@ -1,0 +1,24 @@
+ARG BUILD_IMAGE=node:16-alpine
+ARG TEST_IMAGE=zxteamorg/messenger-bridge/local
+
+FROM ${TEST_IMAGE} AS test_image
+WORKDIR /usr/local/zxteamorg/messenger-bridge
+COPY package*.json ./
+RUN npm install --no-progress
+COPY test ./test
+COPY .npmrc tsconfig.json tslint.json ./
+RUN echo -e '{\n\
+	"extends": "./tsconfig.json",\n\
+	"include": [\n\
+		"test/**/*"\n\
+	],\n\
+	"compilerOptions": {\n\
+		"rootDir": "test",\n\
+		"sourceMap": true,\n\
+		"sourceRoot": "test"\n\
+	}\n\
+}' > tsconfig-test.json
+RUN npx tsc --project tsconfig-test.json
+COPY docker/docker-entrypoint-tests.sh /usr/local/bin/
+VOLUME [ "/test-results" ]
+ENTRYPOINT [ "/usr/local/bin/docker-entrypoint-tests.sh" ]

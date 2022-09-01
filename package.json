@@ -1,9 +1,9 @@
 {
 	"name": "@zxteam/messenger-bridge",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"description": "APPROVE ME is a helper service to collect approvement votes via messenger networks like Telegram, Slack, etc...",
-	"main": "./src/index.js",
-	"types": "./src/index.d.ts",
+	"main": "./lib/index.js",
+	"types": "./lib/index.d.ts",
 	"author": {
 		"name": "ZXTeam",
 		"email": "devel@zxteam.org",
@@ -22,13 +22,14 @@
 	],
 	"license": "MIT",
 	"devDependencies": {
-		"@types/lodash": "^4.14.184",
 		"@types/chai": "^4.3.1",
+		"@types/lodash": "^4.14.184",
 		"@types/mocha": "^9.1.1",
 		"@types/mustache": "^4.2.1",
 		"@types/uuid": "^8.3.4",
 		"chai": "^4.3.6",
 		"mocha": "^10.0.0",
+		"mocha-junit-reporter": "^2.1.0",
 		"nyc": "^15.1.0",
 		"source-map-support": "^0.5.21",
 		"typescript": "^4.8.2"
@@ -49,7 +50,7 @@
 	"scripts": {
 		"clean": "find src \\( -name '*.js' -o -name '*.d.ts' -o -name '*.map' \\) -exec rm {} \\; ; find test \\( -name '*.js' -o -name '*.d.ts' -o -name '*.map' \\) -exec rm {} \\;",
 		"build": "tsc",
-		"build:package": "rm -rf lib && tsc --project tsconfig-package.json && cp README.md .dist/ && jq '{ name: .name, version: .version, description: .description, author: .author, contributors: .contributors, license: .license, keywords: .keywords, repository: .repository, bugs: .bugs, engines: .engines, homepage: .homepage, main: \"lib/index.js\", types: \"lib/index.d.ts\", dependencies: .dependencies }' package.json > .dist/package.json",
+		"build:dist": "rm -rf .dist && tsc --project tsconfig-dist.json && cp README.md .dist/ && cp -a bin .dist/ && cp -a res .dist/ && jq '{ name: .name, version: .version, description: .description, author: .author, contributors: .contributors, license: .license, keywords: .keywords, repository: .repository, bugs: .bugs, engines: .engines, homepage: .homepage, main: \"lib/index.js\", types: \"lib/index.d.ts\", dependencies: .dependencies }' package.json > .dist/package.json",
 		"test": "tsc && nyc --exclude submodules --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha --require source-map-support/register --recursive --timeout 10000 \"test/**/*.test.js\"",
 		"test:only": "tsc && mocha --require source-map-support/register \"test/**/*.test.js\" --recursive --timeout 10000"
 	},

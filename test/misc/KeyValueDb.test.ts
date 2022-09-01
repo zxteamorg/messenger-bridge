@@ -1,12 +1,16 @@
 import { FCancellationToken, FExecutionContext, Fusing } from "@freemework/common";
 import { assert } from "chai";
 
-import { InMemory, KeyValueDb } from "../../src/misc/KeyValueDb";
+import { InMemory, KeyValueDb } from "../../lib/misc/KeyValueDb";
 
 for (const { dbFactory, name } of [
 	{ name: InMemory.name, dbFactory: () => new InMemory() }
 ]) {
 	describe(`KeyValueDb implementation '${name}' tests`, function () {
+		it(`Platform test ${process.platform} (${process.arch})`, function () {
+			assert.equal(42, 42);
+		});
+
 		it("find() should return null for non-existent key", async function () {
 			const db: KeyValueDb = dbFactory();
 			const value: KeyValueDb.Value | null = await db.find(FExecutionContext.None, "testKey");

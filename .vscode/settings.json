@@ -23,18 +23,30 @@
 		".package": true,
 		"coverage": true,
 		"node_modules": true,
-		"src/**/*.d.ts": true,
-		"src/**/*.js": true,
-		"src/**/*.map": true,
+		"lib/**/*.d.ts": true,
+		"lib/**/*.js": true,
+		"lib/**/*.map": true,
 		"test/**/*.d.ts":true,
 		"test/**/*.js":true,
 		"test/**/*.map":true,
-		"test.app/**/*.d.ts":true,
-		"test.app/**/*.js":true,
-		"test.app/**/*.map":true
-
 	},
 	"git.enabled": true,
 	"git.rebaseWhenSync": true,
-	"editor.guides.indentation": true
+	"editor.guides.indentation": true,
+	"cSpell.words": [
+		"Anurin",
+		"appender",
+		"Buildx",
+		"Dockerfiles",
+		"dockerhub",
+		"dorny",
+		"elif",
+		"esac",
+		"freemework",
+		"lcov",
+		"Serhii",
+		"skopeo",
+		"Zghama",
+		"zxteam"
+	]
 }
