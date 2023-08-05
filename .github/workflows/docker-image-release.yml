@@ -1,10 +1,7 @@
 #
 # Copied from https://github.com/zxteamorg/.github/blob/master/workflow-templates/docker-image-release.yml
 #
-# Dev Notes:
-#   if you intend to update this workflow for all projects,
-#   it is add it into your project as physical symlink
-#   `ln -P ../../../_github/workflow-templates/docker-image-release.yml`
+# See for documentation at https://github.com/zxteamorg/.github/blob/master/workflow-templates/docker-image.md
 #
 
 name: Docker Images (Release)
@@ -12,41 +9,45 @@ name: Docker Images (Release)
 env:
   # Repo-root relative path to directory with your Dockerfile(s)
   DOCKER_FILES_DIR: docker
-  # Space separated Docker platform list
+  # Comma separated list of Docker platforms
   DOCKER_PLATFORMS: linux/amd64,linux/arm64
   # Define one of test report format: dart-json, dotnet-trx, flutter-json, java-junit, jest-junit, mocha-json
   TEST_REPORT_FORMAT: java-junit
-  # Override path to GitHub Container Repository
-  GHCR_REPOSITORY: "${{ github.repository }}"
-  # Set to "yes" to publish image into https://hub.docker.com
-  DOCKERHUB_PUBLISH: yes
-  # Override path to Docker Hub repository
-  DOCKERHUB_REPOSITORY: "${{ github.repository }}"
+  # Set path to GitHub Container Repository
+  REGISTRY_GHCR_REPOSITORY_PATH: "${{ github.repository }}"
+  #REGISTRY_GHCR_REPOSITORY_PATH: "${{ github.repository }}/orphan-branch"
+  # To enable publish into Docker Hub (https://hub.docker.com/)
+  # by set Docker Hub user/organization ID
+  REGISTRY_DOCKERHUB_REPOSITORY_ORG: "${{ github.repository_owner }}"
 
 on:
   push:
     tags:
       - '*'
 
+run-name: Docker Images (${{ format('{0}.{1}', github.ref_name, github.sha) }})
+
 jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
-      app_dockerfiles: ${{ steps.dockerfiles.outputs.app_dockerfiles }}
-      app_dockerfiles_count: ${{ steps.dockerfiles.outputs.app_dockerfiles_count }}
-      commit_short_sha: ${{ steps.build_vars.outputs.commit_short_sha }}
-      build_commit_ref: ${{ steps.build_vars.outputs.build_commit_ref }}
-      build_commit_timestamp: ${{ steps.build_vars.outputs.build_commit_timestamp }}
-      build_is_release_candidate: ${{ steps.build_vars.outputs.build_is_release_candidate }}
-      build_pipeline_url: ${{ steps.build_vars.outputs.build_pipeline_url }}
-      build_project_url: ${{ steps.build_vars.outputs.build_project_url }}
-      build_rc_version: ${{ steps.build_vars.outputs.build_rc_version }}
-      build_tag_version: ${{ steps.build_vars.outputs.build_tag_version }}
-      build_version_appender: ${{ steps.build_vars.outputs.build_version_appender }}
-      platforms: ${{ steps.platforms.outputs.platforms }}
-      platforms_count: ${{ steps.platforms.outputs.platforms_count }}
-      test_dockerfiles: ${{ steps.dockerfiles.outputs.test_dockerfiles }}
-      test_dockerfiles_count: ${{ steps.dockerfiles.outputs.test_dockerfiles_count }}
+      build_app_dockerfiles: ${{ steps.dockerfiles.outputs.app_dockerfiles }}
+      build_app_dockerfiles_count: ${{ steps.dockerfiles.outputs.app_dockerfiles_count }}
+      build_commit_short_sha: ${{ steps.build_vars.outputs.commit_short_sha }}
+      build_commit_ref: ${{ steps.build_vars.outputs.commit_ref }}
+      build_commit_timestamp: ${{ steps.build_vars.outputs.commit_timestamp }}
+      build_image_tag_prefix: ${{ steps.build_vars.outputs.image_tag_prefix }}
+      build_dockerhub_publish: ${{ steps.build_vars.outputs.dockerhub_publish }}
+      build_is_release_candidate: ${{ steps.build_vars.outputs.is_release_candidate }}
+      build_pipeline_url: ${{ steps.build_vars.outputs.pipeline_url }}
+      build_project_url: ${{ steps.build_vars.outputs.project_url }}
+      build_rc_version: ${{ steps.build_vars.outputs.rc_version }}
+      build_tag_version: ${{ steps.build_vars.outputs.tag_version }}
+      build_version_appender: ${{ steps.build_vars.outputs.version_appender }}
+      build_platforms: ${{ steps.platforms.outputs.platforms }}
+      build_platforms_count: ${{ steps.platforms.outputs.platforms_count }}
+      build_test_dockerfiles: ${{ steps.dockerfiles.outputs.test_dockerfiles }}
+      build_test_dockerfiles_count: ${{ steps.dockerfiles.outputs.test_dockerfiles_count }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -57,8 +58,8 @@ jobs:
         PLATFORMS_JSON_ARRAY=$(echo "\"$DOCKER_PLATFORMS\""  | jq -c 'split(",")')
         PLATFORMS_COUNT=$(echo "${PLATFORMS_JSON_ARRAY}" | jq '. | length')
         echo "Build for ${PLATFORMS_COUNT} platform(s): ${DOCKER_PLATFORMS}"
-        echo "::set-output name=platforms::${PLATFORMS_JSON_ARRAY}"
-        echo "::set-output name=platforms_count::${PLATFORMS_COUNT}"
+        echo "platforms=${PLATFORMS_JSON_ARRAY}" | tee -a "${GITHUB_OUTPUT}"
+        echo "platforms_count=${PLATFORMS_COUNT}" | tee -a "${GITHUB_OUTPUT}"
 
     - name: Detect Dockerfiles
       id: dockerfiles
@@ -83,10 +84,10 @@ jobs:
         DOCKER_APP_FILES_JSON_ARRAY=$(echo "\"$COMMA_SEPARATED_DOCKER_APP_FILES\""  | jq -c 'split(",")')
         DOCKER_TEST_FILES_JSON_ARRAY=$(echo "\"$COMMA_SEPARATED_DOCKER_TEST_FILES\""  | jq -c 'split(",")')
 
-        echo "::set-output name=app_dockerfiles::${DOCKER_APP_FILES_JSON_ARRAY}"
-        echo "::set-output name=test_dockerfiles::${DOCKER_TEST_FILES_JSON_ARRAY}"
-        echo "::set-output name=app_dockerfiles_count::${#DOCKER_APP_FILES[@]}"
-        echo "::set-output name=test_dockerfiles_count::${#DOCKER_TEST_FILES[@]}"
+        echo "app_dockerfiles=${DOCKER_APP_FILES_JSON_ARRAY}" | tee -a "${GITHUB_OUTPUT}"
+        echo "app_dockerfiles_count=${#DOCKER_APP_FILES[@]}" | tee -a "${GITHUB_OUTPUT}"
+        echo "test_dockerfiles=${DOCKER_TEST_FILES_JSON_ARRAY}" | tee -a "${GITHUB_OUTPUT}"
+        echo "test_dockerfiles_count=${#DOCKER_TEST_FILES[@]}" | tee -a "${GITHUB_OUTPUT}"
 
     - name: Build variables
       id: build_vars
@@ -100,44 +101,39 @@ jobs:
         BUILD_COMMIT_REF="${{ github.sha }}"
         BUILD_COMMIT_TIMESTAMP="${{ github.event.head_commit.timestamp }}"
         BUILD_PROJECT_URL="${{ github.server_url }}/${{ github.repository }}"
+        BUILD_IMAGE_TAG_PREFIX="${{ github.ref_name }}"
         if [ -n "${BUILD_RC_VERSION}" ]; then
-          BUILD_TAG_VERSION="$(echo -n "${{ github.ref_name }}" | sed 's/-rc[0-9]\+$//')"
+          BUILD_TAG_VERSION="$(echo -n "${{ github.ref_name }}" | rev | cut -d- -f2 | rev)"
           BUILD_VERSION_APPENDER="-rc${BUILD_RC_VERSION}"
+          BUILD_IS_RELEASE_CANDIDATE="yes"
         else
-          BUILD_TAG_VERSION="${{ github.ref_name }}"
+          BUILD_TAG_VERSION=$(echo -n "${{ github.ref_name }}" | rev | cut -d- -f1 | rev)
           BUILD_VERSION_APPENDER=""
+          BUILD_IS_RELEASE_CANDIDATE="no"
         fi
-        echo "  BUILD_VERSION_APPENDER: ${BUILD_VERSION_APPENDER}"
-        echo "::set-output name=build_version_appender::${BUILD_VERSION_APPENDER}"
-        echo "  SHORT_SHA: ${SHORT_SHA}"
-        echo "::set-output name=commit_short_sha::${SHORT_SHA}"
-        echo "  BUILD_COMMIT_REF: ${BUILD_COMMIT_REF}"
-        echo "::set-output name=build_commit_ref::${BUILD_COMMIT_REF}"
-        echo "  BUILD_COMMIT_TIMESTAMP: ${BUILD_COMMIT_TIMESTAMP}"
-        echo "::set-output name=build_commit_timestamp::${BUILD_COMMIT_TIMESTAMP}"
-        echo "  BUILD_PIPELINE_URL: ${BUILD_PIPELINE_URL}"
-        echo "::set-output name=build_pipeline_url::${BUILD_PIPELINE_URL}"
-        echo "  BUILD_PROJECT_URL: ${BUILD_PROJECT_URL}"
-        echo "::set-output name=build_project_url::${BUILD_PROJECT_URL}"
-        echo "  BUILD_RC_VERSION: ${BUILD_RC_VERSION}"
-        echo "::set-output name=build_rc_version::${BUILD_RC_VERSION}"
-        echo "  BUILD_TAG_VERSION: ${BUILD_TAG_VERSION}"
-        echo "::set-output name=build_tag_version::${BUILD_TAG_VERSION}"
-        case "${DOCKERHUB_PUBLISH}" in
-          yes|YES)
-            echo "::set-output name=dockerhub_publish::yes"
-            ;;
-          *)
-            echo "::set-output name=dockerhub_publish::no"
-            ;;
-        esac
+
+        echo "version_appender=${BUILD_VERSION_APPENDER}" | tee -a "${GITHUB_OUTPUT}"
+        echo "commit_short_sha=${SHORT_SHA}" | tee -a "${GITHUB_OUTPUT}"
+        echo "commit_ref=${BUILD_COMMIT_REF}" | tee -a "${GITHUB_OUTPUT}"
+        echo "commit_timestamp=${BUILD_COMMIT_TIMESTAMP}" | tee -a "${GITHUB_OUTPUT}"
+        echo "image_tag_prefix=${BUILD_IMAGE_TAG_PREFIX}" | tee -a "${GITHUB_OUTPUT}"
+        echo "is_release_candidate=${BUILD_IS_RELEASE_CANDIDATE}" | tee -a "${GITHUB_OUTPUT}"
+        echo "pipeline_url=${BUILD_PIPELINE_URL}" | tee -a "${GITHUB_OUTPUT}"
+        echo "project_url=${BUILD_PROJECT_URL}" | tee -a "${GITHUB_OUTPUT}"
+        echo "rc_version=${BUILD_RC_VERSION}" | tee -a "${GITHUB_OUTPUT}"
+        echo "tag_version=${BUILD_TAG_VERSION}" | tee -a "${GITHUB_OUTPUT}"
+        if [ -n "${REGISTRY_DOCKERHUB_REPOSITORY_ORG}" ]; then
+          echo "dockerhub_publish=yes" | tee -a "${GITHUB_OUTPUT}"
+        else
+          echo "dockerhub_publish=no" | tee -a "${GITHUB_OUTPUT}"
+        fi
 
   docker-build:
     needs:
     - configure
     strategy:
       matrix:
-        dockerfile: ${{ fromJson(needs.configure.outputs.app_dockerfiles) }}
+        dockerfile: ${{ fromJson(needs.configure.outputs.build_app_dockerfiles) }}
     runs-on: ubuntu-latest
     steps:
     - name: Set up environment variables
@@ -177,31 +173,32 @@ jobs:
           BUILD_RC_VERSION=${{ needs.configure.outputs.build_rc_version }}
           BUILD_TAG_VERSION=${{ needs.configure.outputs.build_tag_version }}
           BUILD_VERSION_APPENDER=${{ needs.configure.outputs.build_version_appender }}
-        platforms: ${{ join(fromJson(needs.configure.outputs.platforms), ',') }}
+        platforms: ${{ join(fromJson(needs.configure.outputs.build_platforms), ',') }}
         push: true
-        tags: "ghcr.io/${{ env.GHCR_REPOSITORY }}${{ env.DOCKERFILE_NAME_SUFFIX }}:${{ github.ref_name }}.${{ github.sha }}"
+        tags: "ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${{ env.DOCKERFILE_NAME_SUFFIX }}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}"
 
   docker-test:
     needs:
     - configure
     - docker-build
+    if: needs.configure.outputs.build_test_dockerfiles_count > 0
     strategy:
       matrix:
-        dockerfile: ${{ fromJson(needs.configure.outputs.test_dockerfiles) }}
-        platform: ${{ fromJson(needs.configure.outputs.platforms) }}
+        dockerfile: ${{ fromJson(needs.configure.outputs.build_test_dockerfiles) }}
+        platform: ${{ fromJson(needs.configure.outputs.build_platforms) }}
     runs-on: ubuntu-latest
     steps:
     - name: Set up environment variables
       run: |
         PLATFORM_SLUG=$(echo "${{ matrix.platform }}" | sed 's~/~-~g')
-        echo "PLATFORM_SLUG=${PLATFORM_SLUG}" >> $GITHUB_ENV
+        echo "PLATFORM_SLUG=${PLATFORM_SLUG}" | tee -a "${GITHUB_ENV}"
         APP_DOCKER_FILE=$(echo "${{ matrix.dockerfile }}" | sed 's/\.[^.]*$//')
         SUFFIX=$(echo "${APP_DOCKER_FILE}" | cut -d'.' -f2-)
         if [ -n "${SUFFIX}" -a "${SUFFIX}" != "Dockerfile" ]; then
-          echo "APP_DOCKER_IMAGE_SUFFIX=/${SUFFIX}" >> $GITHUB_ENV
-          GEN_IMAGE_SUFFIX="-${SUFFIX}" >> $GITHUB_ENV
+          echo "APP_DOCKER_IMAGE_SUFFIX=/${SUFFIX}" | tee -a "${GITHUB_ENV}"
+          GEN_IMAGE_SUFFIX="-${SUFFIX}" | tee -a "${GITHUB_ENV}"
         fi
-        echo "GEN_IMAGE_TAG=test-release-image${GEN_IMAGE_SUFFIX}-${PLATFORM_SLUG}" >> $GITHUB_ENV
+        echo "GEN_IMAGE_TAG=test-release-image${GEN_IMAGE_SUFFIX}-${PLATFORM_SLUG}" | tee -a "${GITHUB_ENV}"
 
     - name: Checkout
       uses: actions/checkout@v3
@@ -217,7 +214,7 @@ jobs:
       run: |
         docker build \
           --platform=${{ matrix.platform }} \
-          --build-arg TEST_IMAGE="ghcr.io/${{ env.GHCR_REPOSITORY }}${APP_DOCKER_IMAGE_SUFFIX}:${{ github.ref_name }}.${{ github.sha }}" \
+          --build-arg TEST_IMAGE="ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${APP_DOCKER_IMAGE_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
           --build-arg BUILD_CONFIGURATION=release \
           --tag "${GEN_IMAGE_TAG}" \
           --file "${DOCKER_FILES_DIR}/${{ matrix.dockerfile }}" \
@@ -249,73 +246,110 @@ jobs:
       if: env.TEST_REPORT_FORMAT == 'java-junit' && steps.upload-artifact.conclusion == 'success'
 
   publish-dockerhub:
-    if: needs.configure.outputs.dockerhub_publish == 'yes' && needs.configure.outputs.is_release_candidate == 'no'
-    needs:
-    - configure
-    - docker-test
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check conditions
-      run: |
-        if [ "${{ needs.configure.outputs.app_dockerfiles_count }}" != '1' ]; then
-          echo "Failure! This repository contains more that one application Dockerfile. The job available for repositories with one application Dockerfile only. To skip the job use 'DOCKERHUB_PUBLISH: false'" >&2
-          exit 1
-        fi
-
-    - name: Set up environment variables
-      run: |
-        SUFFIX=$(echo "${{ fromJson(needs.configure.outputs.app_dockerfiles)[0] }}" | cut -d'.' -f2-)
-        if [ -n "${SUFFIX}" -a "${SUFFIX}" != "Dockerfile" ]; then
-          echo "DOCKERFILE_NAME_SUFFIX=/${SUFFIX}" >> $GITHUB_ENV
-        fi
-
-    - name: Log in to the Docker Hub Registry
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Tags and push
-      run: |
-        skopeo copy --all \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:${{ github.ref_name }}.${{ github.sha }}" \
-          "docker://${DOCKERHUB_REPOSITORY}:${{ github.ref_name }}"
-        skopeo copy --all \
-          "docker://${DOCKERHUB_REPOSITORY}:${{ github.ref_name }}" \
-          "docker://${DOCKERHUB_REPOSITORY}:latest"
-
-  publish-dockerhub-readme:
-    needs:
-    - configure
-    - docker-test
-    - publish-dockerhub
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Update image README and description
-        uses: peter-evans/dockerhub-description@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          repository: ${{ env.DOCKERHUB_REPOSITORY }}
-          short-description: ${{ github.event.repository.description }}
-
-  publish-github:
     needs:
     - configure
     - docker-test
     strategy:
       matrix:
-        dockerfile: ${{ fromJson(needs.configure.outputs.app_dockerfiles) }}
+        dockerfile: ${{ fromJson(needs.configure.outputs.build_app_dockerfiles) }}
+    if: |
+      always() &&
+      needs.configure.outputs.build_dockerhub_publish == 'yes' &&
+      needs.configure.outputs.build_is_release_candidate == 'no' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     steps:
     - name: Set up environment variables
       run: |
         SUFFIX=$(echo "${{ matrix.dockerfile }}" | cut -d'.' -f2-)
         if [ -n "${SUFFIX}" -a "${SUFFIX}" != "Dockerfile" ]; then
-          echo "DOCKERFILE_NAME_SUFFIX=/${SUFFIX}" >> $GITHUB_ENV
+          echo "DOCKER_IMAGE_NAME=${SUFFIX}" | tee -a "${GITHUB_ENV}"
+          echo "DOCKERFILE_NAME_SUFFIX=/${SUFFIX}" | tee -a "${GITHUB_ENV}"
+        else
+          REPOSITORY_NAME=$(echo "${{ github.repository }}" | cut -d/ -f2)
+          echo "DOCKER_IMAGE_NAME=${REPOSITORY_NAME}" | tee -a "${GITHUB_ENV}"
+        fi
+
+    - name: Log in to the GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Log in to the Docker Hub Registry
+      uses: docker/login-action@v2
+      with:
+        username: ${{ vars.REGISTRY_DOCKERHUB_PUSH_USERNAME }}
+        password: ${{ secrets.REGISTRY_DOCKERHUB_PUSH_TOKEN }}
+
+    - name: Tags and push
+      run: |
+        skopeo copy --all \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+          "docker://${REGISTRY_DOCKERHUB_REPOSITORY_ORG}/${DOCKER_IMAGE_NAME}:${{ needs.configure.outputs.build_image_tag_prefix }}"
+        skopeo copy --all \
+          "docker://${REGISTRY_DOCKERHUB_REPOSITORY_ORG}/${DOCKER_IMAGE_NAME}:${{ needs.configure.outputs.build_image_tag_prefix }}" \
+          "docker://${REGISTRY_DOCKERHUB_REPOSITORY_ORG}/${DOCKER_IMAGE_NAME}:latest"
+
+  publish-dockerhub-readme:
+    needs:
+    - configure
+    - docker-test
+    - publish-dockerhub
+    strategy:
+      matrix:
+        dockerfile: ${{ fromJson(needs.configure.outputs.build_app_dockerfiles) }}
+    if: |
+      always() &&
+      needs.configure.outputs.build_dockerhub_publish == 'yes' &&
+      needs.configure.outputs.build_is_release_candidate == 'no' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Set up environment variables
+      run: |
+        SUFFIX=$(echo "${{ matrix.dockerfile }}" | cut -d'.' -f2-)
+        if [ -n "${SUFFIX}" -a "${SUFFIX}" != "Dockerfile" ]; then
+          echo "DOCKER_IMAGE_NAME=${SUFFIX}" | tee -a "${GITHUB_ENV}"
+          echo "README_FILE_NAME_SUFFIX=.${SUFFIX}" | tee -a "${GITHUB_ENV}"
+        else
+          REPOSITORY_NAME=$(echo "${{ github.repository }}" | cut -d/ -f2)
+          echo "DOCKER_IMAGE_NAME=${REPOSITORY_NAME}" | tee -a "${GITHUB_ENV}"
+        fi
+
+    - name: Update image README and description
+      uses: peter-evans/dockerhub-description@v3
+      with:
+        username: ${{ vars.REGISTRY_DOCKERHUB_PUSH_USERNAME }}
+        password: ${{ secrets.REGISTRY_DOCKERHUB_PUSH_TOKEN }}
+        repository: ${{ env.REGISTRY_DOCKERHUB_REPOSITORY_ORG }}/${{ env.DOCKER_IMAGE_NAME }}
+        short-description: ${{ github.event.repository.description }}
+        readme-filepath: ${{ env.DOCKER_FILES_DIR }}/README${{ env.README_FILE_NAME_SUFFIX }}.md
+
+  publish-github:
+    needs:
+    - configure
+    - docker-test
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    strategy:
+      matrix:
+        dockerfile: ${{ fromJson(needs.configure.outputs.build_app_dockerfiles) }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up environment variables
+      run: |
+        SUFFIX=$(echo "${{ matrix.dockerfile }}" | cut -d'.' -f2-)
+        if [ -n "${SUFFIX}" -a "${SUFFIX}" != "Dockerfile" ]; then
+          echo "DOCKERFILE_NAME_SUFFIX=/${SUFFIX}" | tee -a "${GITHUB_ENV}"
         fi
 
     - name: Log in to the GitHub Container Registry
@@ -328,11 +362,11 @@ jobs:
     - name: Tags and push
       run: |
         skopeo copy --all \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:${{ github.ref_name }}.${{ github.sha }}" \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:${{ github.ref_name }}.${{ needs.configure.outputs.commit_short_sha }}"
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ needs.configure.outputs.build_commit_short_sha }}"
         skopeo copy --all \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:${{ github.ref_name }}.${{ needs.configure.outputs.commit_short_sha }}" \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:${{ github.ref_name }}"
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ needs.configure.outputs.build_commit_short_sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}"
         skopeo copy --all \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:${{ github.ref_name }}" \
-          "docker://ghcr.io/${{ env.GHCR_REPOSITORY }}${DOCKERFILE_NAME_SUFFIX}:latest"
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:latest"

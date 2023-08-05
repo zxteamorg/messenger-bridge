@@ -22,7 +22,7 @@ ARG BUILD_RC_VERSION
 ARG BUILD_TAG_VERSION
 ARG BUILD_VERSION_APPENDER
 WORKDIR /build
-RUN apk add --no-cache jq
+RUN apk add --no-cache jq moreutils
 COPY package*.json ./
 RUN \
   set -e; \
@@ -34,9 +34,11 @@ RUN \
       exit 1; \
     fi; \
   fi; \
+  if [ -n "${BUILD_RC_VERSION}" ]; then \
+    jq -M ".build.release_candidate=\"${BUILD_RC_VERSION}\"" < package.json | sponge package.json; \
+  fi; \
   if [ -n "${BUILD_VERSION_APPENDER}" ]; then \
-    PROJ_SPEC=$(jq ".version = \"${PROJ_VERSION}${BUILD_VERSION_APPENDER}\"" package.json); \
-    echo -E "${PROJ_SPEC}" > package.json; \
+	jq -M ".build.version=\"${PROJ_VERSION}${BUILD_VERSION_APPENDER}\"" < package.json | sponge package.json; \
   fi;
 RUN npm install --no-progress
 COPY bin ./bin
