@@ -286,9 +286,6 @@ jobs:
           skopeo copy --all \
             "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
             "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}"
-          skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:latest"
           if [ "${{ needs.configure.outputs.build_is_release_candidate }}" == "no" ]; then
             TAG_VERSION_MAJOR="$(echo "${{ needs.configure.outputs.build_tag_version }}" | cut -d. -f1)"
             TAG_VERSION_MAJOR_MINOR="$(echo "${{ needs.configure.outputs.build_tag_version }}" | cut -d. -f1-2)"
@@ -299,6 +296,9 @@ jobs:
               "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
               "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${TAG_VERSION_MAJOR}"
           fi
+          skopeo copy --all \
+            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:latest"
         else
           skopeo copy --all \
             "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
