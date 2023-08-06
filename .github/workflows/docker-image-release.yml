@@ -361,12 +361,20 @@ jobs:
 
     - name: Tags and push
       run: |
+        TAG_VERSION_MAJOR="$(echo "${{ needs.configure.outputs.build_tag_version }}" | cut -d. -f1)"
+        TAG_VERSION_MAJOR_MINOR="$(echo "${{ needs.configure.outputs.build_tag_version }}" | cut -d. -f1-2)"
         skopeo copy --all \
           "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
           "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ needs.configure.outputs.build_commit_short_sha }}"
         skopeo copy --all \
-          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ needs.configure.outputs.build_commit_short_sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
           "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}"
         skopeo copy --all \
-          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${TAG_VERSION_MAJOR_MINOR}"
+        skopeo copy --all \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${TAG_VERSION_MAJOR}"
+        skopeo copy --all \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
           "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}:latest"
