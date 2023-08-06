@@ -18,7 +18,7 @@ env:
   #REGISTRY_GHCR_REPOSITORY_PATH: "${{ github.repository }}/orphan-branch"
   # To enable publish into Docker Hub (https://hub.docker.com/)
   # by set Docker Hub user/organization ID
-  REGISTRY_DOCKERHUB_REPOSITORY_ORG: "${{ github.repository_owner }}"
+  REGISTRY_DOCKERHUB_REPOSITORY_ORG: "theanurin"
 
 on:
   push:
