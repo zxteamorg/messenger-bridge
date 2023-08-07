@@ -39,12 +39,16 @@ jobs:
       build_commit_short_sha: ${{ steps.build_vars.outputs.commit_short_sha }}
       build_commit_ref: ${{ steps.build_vars.outputs.commit_ref }}
       build_commit_timestamp: ${{ steps.build_vars.outputs.commit_timestamp }}
-      build_image_tag_prefix: ${{ steps.build_vars.outputs.image_tag_prefix }}
+      build_image_tag_version: ${{ steps.build_vars.outputs.image_tag_version }}
+      build_image_tag_version_major: ${{ steps.build_vars.outputs.image_tag_version_major }}
+      build_image_tag_version_major_minor: ${{ steps.build_vars.outputs.image_tag_version_major_minor }}
       build_is_release_candidate: ${{ steps.build_vars.outputs.is_release_candidate }}
       build_pipeline_url: ${{ steps.build_vars.outputs.pipeline_url }}
       build_project_url: ${{ steps.build_vars.outputs.project_url }}
       build_rc_version: ${{ steps.build_vars.outputs.rc_version }}
       build_tag_version: ${{ steps.build_vars.outputs.tag_version }}
+      build_tag_version_major: ${{ steps.build_vars.outputs.tag_version_major }}
+      build_tag_version_major_minor: ${{ steps.build_vars.outputs.tag_version_major_minor }}
       build_version_appender: ${{ steps.build_vars.outputs.version_appender }}
       build_platforms: ${{ steps.platforms.outputs.platforms }}
       build_platforms_count: ${{ steps.platforms.outputs.platforms_count }}
@@ -107,31 +111,40 @@ jobs:
         BUILD_PROJECT_URL="${{ github.server_url }}/${{ github.repository }}"
         if [ "${{ github.ref_type}}" == "tag" ]; then
           if [ -n "${BUILD_RC_VERSION}" ]; then
-            BUILD_IS_RELEASE_CANDIDATE="yes"
             BUILD_TAG_VERSION="$(echo -n "${{ github.ref_name }}" | rev | cut -d- -f2 | rev)"
             BUILD_VERSION_APPENDER="-rc${BUILD_RC_VERSION}-snapshot"
+            BUILD_IS_RELEASE_CANDIDATE="yes"
+            BUILD_IMAGE_TAG_VERSION="${BUILD_TAG_VERSION}-rc${BUILD_RC_VERSION}"
           else
-            BUILD_IS_RELEASE_CANDIDATE="no"
             BUILD_TAG_VERSION="$(echo -n "${{ github.ref_name }}" | rev | cut -d- -f1 | rev)"
             BUILD_VERSION_APPENDER="-snapshot"
+            BUILD_IS_RELEASE_CANDIDATE="no"
+            BUILD_TAG_VERSION_MAJOR="$(echo "${BUILD_TAG_VERSION}" | cut -d. -f1)"
+            BUILD_TAG_VERSION_MAJOR_MINOR="$(echo "${BUILD_TAG_VERSION}" | cut -d. -f1-2)"
+            BUILD_IMAGE_TAG_VERSION="${BUILD_TAG_VERSION}"
+            BUILD_IMAGE_TAG_VERSION_MAJOR="${BUILD_TAG_VERSION_MAJOR}"
+            BUILD_IMAGE_TAG_VERSION_MAJOR_MINOR="${BUILD_TAG_VERSION_MAJOR_MINOR}"
           fi
-          BUILD_IMAGE_TAG_PREFIX="${{ github.ref_name }}"
         else
+          BUILD_IMAGE_TAG_VERSION="${{ github.ref_name }}"
           BUILD_TAG_VERSION=""
           BUILD_VERSION_APPENDER="-${{github.ref_name}}.${SHORT_SHA}-snapshot"
-          BUILD_IMAGE_TAG_PREFIX="${{ github.ref_name }}"
         fi
 
-        echo "version_appender=${BUILD_VERSION_APPENDER}" | tee -a "${GITHUB_OUTPUT}"
         echo "commit_short_sha=${SHORT_SHA}" | tee -a "${GITHUB_OUTPUT}"
         echo "commit_ref=${BUILD_COMMIT_REF}" | tee -a "${GITHUB_OUTPUT}"
         echo "commit_timestamp=${BUILD_COMMIT_TIMESTAMP}" | tee -a "${GITHUB_OUTPUT}"
-        echo "image_tag_prefix=${BUILD_IMAGE_TAG_PREFIX}" | tee -a $GITHUB_OUTPUT
+        echo "image_tag_version=${BUILD_IMAGE_TAG_VERSION}" | tee -a "${GITHUB_OUTPUT}"
+        echo "image_tag_version_major=${BUILD_IMAGE_TAG_VERSION_MAJOR}" | tee -a "${GITHUB_OUTPUT}"
+        echo "image_tag_version_major_minor=${BUILD_IMAGE_TAG_VERSION_MAJOR_MINOR}" | tee -a "${GITHUB_OUTPUT}"
         echo "is_release_candidate=${BUILD_IS_RELEASE_CANDIDATE}" | tee -a "${GITHUB_OUTPUT}"
         echo "pipeline_url=${BUILD_PIPELINE_URL}" | tee -a "${GITHUB_OUTPUT}"
         echo "project_url=${BUILD_PROJECT_URL}" | tee -a "${GITHUB_OUTPUT}"
         echo "rc_version=${BUILD_RC_VERSION}" | tee -a "${GITHUB_OUTPUT}"
         echo "tag_version=${BUILD_TAG_VERSION}" | tee -a "${GITHUB_OUTPUT}"
+        echo "tag_version_major=${BUILD_TAG_VERSION_MAJOR}" | tee -a "${GITHUB_OUTPUT}"
+        echo "tag_version_major_minor=${BUILD_TAG_VERSION_MAJOR_MINOR}" | tee -a "${GITHUB_OUTPUT}"
+        echo "version_appender=${BUILD_VERSION_APPENDER}" | tee -a "${GITHUB_OUTPUT}"
 
   docker-build:
     needs:
@@ -180,7 +193,7 @@ jobs:
           BUILD_VERSION_APPENDER=${{ needs.configure.outputs.build_version_appender }}
         platforms: ${{ join(fromJson(needs.configure.outputs.build_platforms), ',') }}
         push: true
-        tags: "ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${{ env.DOCKERFILE_NAME_SUFFIX }}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}"
+        tags: "ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${{ env.DOCKERFILE_NAME_SUFFIX }}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}"
 
   docker-test:
     needs:
@@ -219,7 +232,7 @@ jobs:
       run: |
         docker build \
           --platform=${{ matrix.platform }} \
-          --build-arg TEST_IMAGE="ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${APP_DOCKER_IMAGE_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+          --build-arg TEST_IMAGE="ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${APP_DOCKER_IMAGE_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}" \
           --build-arg BUILD_CONFIGURATION=snapshot \
           --tag "${GEN_IMAGE_TAG}" \
           --file "${DOCKER_FILES_DIR}/${{ matrix.dockerfile }}" \
@@ -279,34 +292,22 @@ jobs:
 
     - name: Tags and push
       run: |
+        skopeo copy --all \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ needs.configure.outputs.build_commit_short_sha }}"
+        skopeo copy --all \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}" \
+          "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}"
         if [ "${{ github.ref_type }}" == "tag" ]; then
-          skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ needs.configure.outputs.build_commit_short_sha }}"
-          skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}"
           if [ "${{ needs.configure.outputs.build_is_release_candidate }}" == "no" ]; then
-            TAG_VERSION_MAJOR="$(echo "${{ needs.configure.outputs.build_tag_version }}" | cut -d. -f1)"
-            TAG_VERSION_MAJOR_MINOR="$(echo "${{ needs.configure.outputs.build_tag_version }}" | cut -d. -f1-2)"
             skopeo copy --all \
-              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${TAG_VERSION_MAJOR_MINOR}"
+              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}" \
+              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version_major_minor }}"
             skopeo copy --all \
-              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${TAG_VERSION_MAJOR}"
+              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}" \
+              "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version_major }}"
           fi
           skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:latest"
-        else
-          skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ needs.configure.outputs.build_commit_short_sha }}"
-          skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}"
-          skopeo copy --all \
-            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_prefix }}.${{ github.sha }}" \
+            "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:${{ needs.configure.outputs.build_image_tag_version }}.${{ github.sha }}" \
             "docker://ghcr.io/${{ env.REGISTRY_GHCR_REPOSITORY_PATH }}${DOCKERFILE_NAME_SUFFIX}-snapshot:latest"
         fi
